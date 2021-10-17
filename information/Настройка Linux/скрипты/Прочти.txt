@@ -1,0 +1,5 @@
+Для передачи файлов по ssh нужно установить
+https://winscp.net/download/WinSCP-5.19.2-Setup.exe
+
+Установка том ката
+https://www.itzgeek.com/how-tos/linux/centos-how-tos/install-apache-tomcat-7-0-on-rhel-6-centos-6.html

@@ -1,0 +1,16 @@
+[Unit]
+Description=ASP.NET Core running on CentOS 8
+
+[Service]
+WorkingDirectory=/var/www/screenShotService
+ExecStart=/usr/bin/dotnet /var/www/screenShotService/ScreenShotGenerator.dll
+Restart=always
+# Restart service after 10 seconds if the dotnet service crashes:
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=screenShotService
+User=screenShotService
+Environment=ASPNETCORE_ENVIRONMENT=Production
+
+[Install]
+WantedBy=multi-user.target

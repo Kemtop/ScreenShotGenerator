@@ -1,0 +1,10 @@
+12:00:46.943 [Information] Hello, world!
+12:26:07.777 [Information] Running service...
+12:26:07.817 [Error] Fatal error
+12:26:07.817 [Information] Create browser 1
+12:46:35.824 [Information] Running service...
+12:46:35.868 [Information] Create browser 1
+12:48:06.573 [Information] Running service...
+12:48:06.608 [Information] Create browser 1
+12:48:15.567 [Error] ::1;https://goo111uogle.ru;Exception in metod takeScreenShot:unknown error: net::ERR_NAME_NOT_RESOLVED
+  (Session info: chrome=94.0.4606.81)

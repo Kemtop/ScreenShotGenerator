@@ -1,0 +1,10 @@
+[Unit]
+Description=Xvfb headless plotting
+After=network.target
+[Service]
+User=ldm
+SyslogIdentifier=%p
+ExecStart=/usr/bin/Xvfb :1 -screen 0 1280x1024x24
+
+[Install]
+WantedBy=multi-user.target
