@@ -1,0 +1,23 @@
+
+
+На сервер посылаем:
+https://localhost:44350/?url[0]=https://2ip.ru&url[1]=https://google.com&url[2]=https://yandex.com&url[3]=https://mail.ru&allowedReferer=1
+
+После обработки всего запроса сервер возвращает json:
+[{"url":"https://google.ru","status":3,"path":"https://localhost:44350/imgCache/692d612491fe04a59462e7e7cd8e8131.jpg"},
+{"url":"https://google.com","status":3,"path":"https://localhost:44350/imgCache/99999ebcfdb78df077ad2727fd00969f.jpg"},
+{"url":"https://yandex.com","status":3,"path":"https://localhost:44350/imgCache/38ab10b4f4f45909d1ebeea10d0a5a6f.jpg"},
+{"url":"https://mail.ru","status":3,"path":"https://localhost:44350/imgCache/c4a87b0e73965dcb6586a78ca4b63901.jpg"}]
+
+
+Если не послать параметр allowedReferer=1, сервис возвращает станицу с надписью "Hello kitty" и ни чего не делает.
+
+Статус(status) может быть:
+3-все хорошо.
+
+2-ошибка,тогда path содержит сведения об ошибке.
+Пример: https://localhost:44350/?url[0]=https://goo111uogle.ru&allowedReferer=1
+[{"url":"https://goo111uogle.ru","status":2,"path":"Exception in metod takeScreenShot:unknown error: net::ERR_NAME_NOT_RESOLVED\n  (Session info: chrome=94.0.4606.81)"}]
+
+
+https://localhost:44350/?url[0]=https://2ip.ru&url[1]=https://gosterfaber789.com&url[2]=https://mail.ru&allowedReferer=1

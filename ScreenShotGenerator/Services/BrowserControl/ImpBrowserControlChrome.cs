@@ -2,6 +2,7 @@
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using ScreenShotGenerator.Services.ScreenShoterLogic;
+using Serilog;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
@@ -41,6 +42,17 @@ namespace ScreenShotGenerator.Services.BrowserControl
         //Директория для хранения картинок.
         private string tmpDir;
 
+        //Идентификатор браузера.
+        private int browserId=0;
+
+        /// <summary>
+        /// Задает идентификатор потока.
+        /// </summary>
+        /// <param name="id"></param>
+       public void setTaskId(int id)
+        {
+            browserId = id;
+        }
 
         /// <summary>
         /// Обработка задач в потоке задач. Выполняется запускает отдельный процесс для проверки и обработки задачи.
@@ -120,7 +132,9 @@ secondFooAsync.BeginInvoke(new AsyncCallback(result =>
                 {
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
                     //Cоздание скриншота.
+                   // Log.Information("take "+p.url+";Browser="+browserId.ToString());
                     string err=takeScreenShot(p.url, p.fileName);
+                    //Log.Information("end " + p.url + ";Browser=" + browserId.ToString());
 
                     p.timestamp = DateTime.Now;
 
@@ -240,7 +254,7 @@ secondFooAsync.BeginInvoke(new AsyncCallback(result =>
                 chromeOptions.AddArgument("--disable-component-update");// ";
                 chromeOptions.AddArgument("--disable-desktop-notifications");
                 chromeOptions.AddArgument("--disable-translate");
-                // chromeOptions.AddArgument("--enable-download-notification"); //не знаю за чем это.
+                chromeOptions.AddArgument("--enable-download-notification"); 
 
                 //" \"$url\" & sleep ".($timeout * ($i + 1)).
                 //" && DISPLAY=:$DISP gm import -window root -crop 1260x965-0+60 -resize 300 $screen_path";

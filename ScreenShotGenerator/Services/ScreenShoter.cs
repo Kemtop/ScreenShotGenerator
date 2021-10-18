@@ -47,7 +47,11 @@ namespace ScreenShotGenerator.Services
 
         //Пул объектов для управления браузерами.
         List<IBrowserControl> poolBrowserControls;
+        //int poolBrowserSize = 4; //Количество запущенных браузеров.
+        //int browserTasksPerThread=5; //Количество задач из пула которые браузер обрабатывает за раз.
+
         int poolBrowserSize = 1; //Количество запущенных браузеров.
+        int browserTasksPerThread=5; //Количество задач из пула которые браузер обрабатывает за раз.
 
 
 
@@ -56,13 +60,15 @@ namespace ScreenShotGenerator.Services
             this.logger = logger;
             _context = context;
             poolTask = new poolTasks();
+            poolTask.tmpDir = tmpDir; //Директория для хранения скриншотов.
+
             poolCache = new poolTasks();
             poolBrowserControls = new List<IBrowserControl>();
 
             //Ведение логов.
             Log.Logger = new LoggerConfiguration()
                .MinimumLevel.Debug()
-               .WriteTo.File(@"Logs\log.txt", rollingInterval: RollingInterval.Day, 
+               .WriteTo.File(@"./Logs/log.txt", rollingInterval: RollingInterval.Day, 
                outputTemplate:"{Timestamp:HH:mm:ss.fff} [{Level}] {Message}{NewLine}{Exception}")
                .CreateLogger();
                        
@@ -78,13 +84,14 @@ namespace ScreenShotGenerator.Services
             await Task.Delay(2000);
             Log.Information("Running service...");
             createBrowserPool();//Создаем пул браузеров.
-         
+            Log.Information("It running.");
+
 
             //Считывает данные кеш из базы данных в память(объект poolCash).
             //readFromDbToCash();
-            
 
-                Thread thread3 = new Thread(() =>
+
+            Thread thread3 = new Thread(() =>
             {
 
                 while (true)
@@ -109,10 +116,14 @@ namespace ScreenShotGenerator.Services
 
         public Task stopService(CancellationToken cancellationToken)
         {
+            Log.Information("Stoping services...");
             //if (Browser != null) Browser.Quit();
+            int i = 1;
             foreach (IBrowserControl bc in poolBrowserControls)
             {
+                Log.Information("Close browser..."+i.ToString());
                 bc.stopBrowser();
+                i++;
             }
 
             logger.LogInformation("StopService");
@@ -132,7 +143,8 @@ namespace ScreenShotGenerator.Services
                 try
                 {
                     IBrowserControl Bc = new ImpBrowserControlChrome();
-                    Bc.tasksPerThread = 1; //Количество задач из пула которые браузер обрабатывает за раз.
+                    Bc.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
+                    Bc.setTaskId(i+1); //Ид браузера, что бы потоки как то можно отличать.
                     Bc.startBrowser();//Запустить браузер.
                                       //Пока не понятно нужна ли тут задержка.
                     Bc.processPool(ref poolTask, ref locker); //Запустить обработку пула задач.
@@ -154,7 +166,7 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
-        public List<mJobPool> runJob(string[] urls, string userIP)
+        public List<mUserJson> runJob(string[] urls, string userIP)
         {
             //Получение корневого url, если уже его не получили.
             getHostName();
@@ -215,10 +227,11 @@ namespace ScreenShotGenerator.Services
                 {                   
                     //Добавляет сведения о выполенных задачах в кеш.
                     addToCash(ref jb);
-                    //Добавляет к именам файлов урл хоста.
-                    setHostUrl(ref jb);
                     logErrors(ref jb, userIP);//Сохраняю сведени об ошибках.
-                    return jb;
+
+                    //Преобразовываю в пользовательский json.
+                    return createUserJson(ref jb);
+                   
                 }
 
                 Thread.Sleep(500);
@@ -246,25 +259,42 @@ namespace ScreenShotGenerator.Services
         }
 
        
-
-
-
         /// <summary>
-        /// Добавляет к именам файлов урл хоста.
+        /// Преобразовываю в пользовательский json.
         /// </summary>
-        private void setHostUrl(ref List<mJobPool> jb)
+        /// <param name="jb"></param>
+        /// <returns></returns>
+        private List<mUserJson> createUserJson(ref List<mJobPool> jb)
         {
-            foreach(mJobPool j in jb)
+            List<mUserJson> userList = new List<mUserJson>();
+
+            foreach (mJobPool j in jb)
             {
+                mUserJson userLine = new mUserJson();
+                userLine.url = j.url;
+             
+
                 //Если не было ошибок.
-                if(j.status==3)
+                if (j.status == 3)
                 {
                     String fullname = hostName + "/" + tmpDir + "/" + j.fileName;
-                    j.path = fullname;
-                }               
+                    userLine.path = fullname;
+                    userLine.status = 1;
+                }
 
+                //Возникла ошибка.
+                if(j.status == 2)
+                {
+                    userLine.log = j.path;
+                    userLine.status = 0;
+                }
+
+                userList.Add(userLine);
             }
+
+            return userList;
         }
+
 
         /// <summary>
         /// Добавляет сведения о выполенных задачах в кеш.

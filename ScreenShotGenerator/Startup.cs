@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -40,6 +41,15 @@ namespace ScreenShotGenerator
             services.AddEntityFrameworkSqlite().AddDbContext<DatabaseContext>();
             services.AddEntityFrameworkSqlite()
             .AddDbContext<DatabaseContext>();
+
+            /*
+            services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .Build();
+            });
+            */
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -68,6 +78,15 @@ namespace ScreenShotGenerator
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}");///{parameters?}
             });
+
+            /*
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllerRoute(
+                    name: "allimage",
+                    pattern: "{controller=Home}/{action=Allimage}");///{parameters?}
+            });
+            */
         }
     }
 }

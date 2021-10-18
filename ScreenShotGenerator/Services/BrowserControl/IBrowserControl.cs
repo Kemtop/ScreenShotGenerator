@@ -17,6 +17,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Количество задач из пула которые браузер обрабатывает за раз.
         /// </summary>
         public int tasksPerThread { get; set; }
+        /// <summary>
+        /// Задает идентификатор потока.
+        /// </summary>
+        /// <param name="id"></param>
+        void setTaskId(int id);
 
         /// <summary>
         /// Обработка задач в потоке задач. Выполняется бесконечно.

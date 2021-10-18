@@ -17,7 +17,7 @@ namespace ScreenShotGenerator.Services
         Task runService(CancellationToken cancellationToken);
         Task stopService(CancellationToken cancellationToken);
         //Запуск процесса создания скринов.
-        List<mJobPool> runJob(string[] url,string userIP);
+        List<mUserJson> runJob(string[] url,string userIP);
        
     }
 }

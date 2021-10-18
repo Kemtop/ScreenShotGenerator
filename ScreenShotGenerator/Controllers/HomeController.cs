@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -50,12 +51,40 @@ namespace ScreenShotGenerator.Controllers
                 IPAddress userIp = HttpContextAccessor.HttpContext.Connection.RemoteIpAddress;
                 string strIP = userIp.ToString();
 
-                List <mJobPool> ret=_screenShoter.runJob(url,strIP);
+                List<mUserJson> ret =_screenShoter.runJob(url,strIP);
                 return Json(ret);//Ok(JSON(ret));
             }
                      
           
         }
+
+
+        public string Welcome()
+        {
+            return "This is the Welcome action method...";
+        }
+
+        public IActionResult  CashImages()
+        {
+            //Получение списка имен файлов.
+            string dirPath = @"wwwroot/imgCache";
+            //var directory 
+                IEnumerable<string> listNames= Directory
+                .GetFiles(dirPath, "*", SearchOption.TopDirectoryOnly)
+                .Select(f => Path.GetFileName(f));
+
+
+            List<mImageList> fileNames = new List<mImageList>();
+            foreach(string str in listNames)
+            {
+                fileNames.Add(new mImageList() { name = "/imgCache/"+str }); ;
+            }
+
+
+
+            return View(fileNames);
+        }
+
 
         public IActionResult Privacy()
         {

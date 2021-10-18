@@ -8,3 +8,16 @@
 12:48:06.608 [Information] Create browser 1
 12:48:15.567 [Error] ::1;https://goo111uogle.ru;Exception in metod takeScreenShot:unknown error: net::ERR_NAME_NOT_RESOLVED
   (Session info: chrome=94.0.4606.81)
+14:08:07.016 [Information] Running service...
+14:08:07.049 [Information] Create browser 1
+14:12:13.701 [Error] ::1;https://goo111uogle.ru;Exception in metod takeScreenShot:unknown error: net::ERR_NAME_NOT_RESOLVED
+  (Session info: chrome=94.0.4606.81)
+19:37:20.254 [Information] Running service...
+19:37:20.302 [Information] Create browser 1
+19:37:22.385 [Information] Create browser 2
+19:37:23.663 [Information] Create browser 3
+19:37:24.958 [Information] Create browser 4
+20:10:13.358 [Information] Running service...
+20:10:13.403 [Information] Create browser 1
+20:11:28.345 [Information] Running service...
+20:11:28.388 [Information] Create browser 1
