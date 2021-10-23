@@ -15,7 +15,14 @@ namespace ScreenShotGenerator
        
         public static void Main(string[] args)
         {
-            CreateHostBuilder(args).Build().Run();
+            var host = CreateHostBuilder(args).Build();
+            using (var scope=host.Services.CreateScope())
+            {
+                DatabeseInitialization.InitAsync(scope.ServiceProvider);
+            }
+
+
+                host.Run();
 
             //https://stackoverflow.com/questions/41675577/where-can-i-log-an-asp-net-core-apps-start-stop-error-events
             //host.WaitForShutdownAsync();
@@ -28,7 +35,7 @@ namespace ScreenShotGenerator
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
-                }).ConfigureServices(services=>services.AddHostedService<BackgroundWorker>());
+                });//.ConfigureServices(services=>services.AddHostedService<BackgroundWorker>());
 
      
 

@@ -1,0 +1,34 @@
+﻿@model ExternalLoginViewModel
+
+<h1>Регистрация в системе с использованием аккаунта соц сетей.</h1>
+<p>
+    Сохраните свое имя.
+</p>
+<div>
+    <form asp-controller="Admin" asp-action="RegisterExternal" method="post">
+        <input hidden asp-for="ReturnUrl" />
+        <div asp-validation-summary="All"></div>
+        <table border="0" cellpadding="2" cellspacing="2">
+            <tr>
+                <td>Username</td>
+                <td>
+                    <input asp-for="Username" />
+                    <span asp-validation-for="Username"></span>
+                </td>
+            </tr>
+       
+            <tr>
+                <td>&nbsp;</td>
+                <td> <button type="submit">Сохранить</button></td>
+            </tr>
+        </table>
+    </form>
+</div>
+<div>@{
+    if(Model.Error!=null)
+            {
+                <p>@Model.Error</p>
+            }
+      }
+    </div>
+<a asp-controller="Home" asp-action="Index">Home</a>

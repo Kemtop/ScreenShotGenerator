@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -33,6 +34,7 @@ namespace ScreenShotGenerator.Controllers
         /// Функция для обработки главной страницы.
         /// </summary>
         /// <returns></returns>
+        [AllowAnonymous]
         public IActionResult Index(string []url,string allowedReferer)
         {            
 
@@ -42,7 +44,8 @@ namespace ScreenShotGenerator.Controllers
 
             //Запрещено пользоваться посторонним лицам.
             if (allowedReferer==null)
-            {
+            {              
+
                return View();
             }
             else
@@ -52,44 +55,24 @@ namespace ScreenShotGenerator.Controllers
                 string strIP = userIp.ToString();
 
                 List<mUserJson> ret =_screenShoter.runJob(url,strIP);
-                return Json(ret);//Ok(JSON(ret));
+                return Json(ret);
             }
                      
           
         }
 
 
-        public string Welcome()
-        {
-            return "This is the Welcome action method...";
-        }
-
-        public IActionResult  CashImages()
-        {
-            //Получение списка имен файлов.
-            string dirPath = @"wwwroot/imgCache";
-            //var directory 
-                IEnumerable<string> listNames= Directory
-                .GetFiles(dirPath, "*", SearchOption.TopDirectoryOnly)
-                .Select(f => Path.GetFileName(f));
-
-
-            List<mImageList> fileNames = new List<mImageList>();
-            foreach(string str in listNames)
-            {
-                fileNames.Add(new mImageList() { name = "/imgCache/"+str }); ;
-            }
-
-
-
-            return View(fileNames);
-        }
-
-
-        public IActionResult Privacy()
+         public IActionResult Privacy()
         {
             return View();
         }
+
+
+        public IActionResult AccessDenied()
+        {
+            return View();
+        }
+
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()

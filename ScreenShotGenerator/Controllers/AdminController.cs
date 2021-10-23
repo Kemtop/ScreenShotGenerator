@@ -1,0 +1,286 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ScreenShotGenerator.Data;
+using ScreenShotGenerator.Entities;
+using ScreenShotGenerator.Models;
+
+namespace ScreenShotGenerator.Controllers
+{
+    [Authorize]
+    public class AdminController : Controller
+    {
+        //Для работы с базой данных.
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
+
+
+        public AdminController(UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager )
+        {
+            _userManager = userManager;
+            _signInManager = signInManager;
+
+        }
+
+
+        /// <summary>
+        /// Контроллер админ страницы.
+        /// </summary>
+        /// <returns></returns>
+        [Authorize(Roles = RolesConst.Admin)]
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+        /// <summary>
+        /// Кеш картинок.
+        /// </summary>
+        /// <returns></returns>
+        [Authorize(Roles = RolesConst.Admin)]
+        public IActionResult CashImages()
+        {
+            //Получение списка имен файлов.
+            string dirPath = @"wwwroot/imgCache";
+            //var directory 
+            IEnumerable<string> listNames = Directory
+            .GetFiles(dirPath, "*", SearchOption.TopDirectoryOnly)
+            .Select(f => Path.GetFileName(f));
+
+
+            List<mImageList> fileNames = new List<mImageList>();
+            foreach (string str in listNames)
+            {
+                fileNames.Add(new mImageList() { name = "/imgCache/" + str }); ;
+            }
+
+
+
+            return View(fileNames);
+        }
+
+
+
+        /// <summary>
+        /// Непосредственно контролер на который происходит редирект, если пользователь не авторизировался.
+        /// </summary>
+        /// <param name="returnUrl"></param>
+        /// <returns></returns>
+        [AllowAnonymous]
+        public async Task<IActionResult> Login(string returnUrl)
+        {
+            //Для авторизации через соц сети.
+            var externalProvider = await _signInManager.GetExternalAuthenticationSchemesAsync();
+
+            return View(new LoginViewModel
+            {
+                ReturnUrl = returnUrl,
+                ExternalProviders = externalProvider
+            });
+
+        }
+
+
+
+        /// <summary>
+        ///Контроллер для авторизации через логин и пароль.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [AllowAnonymous]
+        [HttpPost]
+        public async Task<IActionResult> Login(LoginViewModel model)
+        {
+            //Список внешних провайдеров.
+            var externalProvider = await _signInManager.GetExternalAuthenticationSchemesAsync();
+                       
+            //В некоторых случаях если пользователь очень быстро нажимает на кнопку "Войти"
+            //в контроллер приходит пустая модель. Решено сделать так. Иначе исключение.
+            if(model==null)
+            {
+                return Ok();
+            }
+
+            //Передаю список внешних провайдеров.
+            model.ExternalProviders = externalProvider;
+
+            //Если не чего не ввел.
+            if (!ModelState.IsValid)
+            {
+                 return View(model);
+            }
+
+
+            var user = await _userManager.FindByNameAsync(model.Username);
+
+            //Пользователь не найден.
+            if (user == null)
+            {
+                ModelState.AddModelError("", "User not found/Пользователь не найден.");                
+                return View(model);
+            }
+
+            //Авторизация
+            var result = await _signInManager.PasswordSignInAsync(user, model.Password, false, false);
+            if (result.Succeeded) //Авторизировался.
+            {
+                return Redirect(model.ReturnUrl);
+            }
+
+            return View(model);
+        }
+
+
+
+        /// <summary>
+        /// Авторизация через внешнего провайдера-соц. сети. Контроллер для нажатия кнопки.
+        /// </summary>
+        /// <param name="provider"></param>
+        /// <param name="returnUrl"></param>
+        /// <returns></returns>
+        [AllowAnonymous]
+        public IActionResult ExternalLogin(string provider, string returnUrl)
+        {
+            //Url на который вернет нас внешний провайдер после проверки пользователя.
+            var redirectUrl = Url.Action(nameof(ExternalLoginCallback),"Admin",new { returnUrl});
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider,redirectUrl);
+            return Challenge(properties,provider);
+
+        }
+
+
+        /// <summary>
+        /// Контроллер на который переадресует после прохождения авторизации во внешнем провайдере.
+        /// </summary>
+        /// <param name="returnUrl"></param>
+        /// <returns></returns>
+        [AllowAnonymous]
+        public async Task<IActionResult> ExternalLoginCallback(string returnUrl)
+        {
+            //Возвращаем информаци об удаленной авторизации.
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+
+
+            //По чему то авторизация не произошла.
+            if(info==null)
+            {
+                return RedirectToAction("Login");
+            }
+
+            //Все хорошо, и пользователь авторизировался.
+
+            //Авторизуем пользователя при помощи провайдера в нашей системе.
+           var result=
+                await _signInManager.ExternalLoginSignInAsync(info.LoginProvider,info.ProviderKey,false,false);
+
+            //Пользователь существует в нашей системе.
+            if(result.Succeeded)
+            {
+                //Переход на страницу пользователя.
+                return RedirectToAction("","UserPage");
+            }
+
+            return RedirectToAction("RegisterExternal", new ExternalLoginViewModel
+            {
+                ReturnUrl = returnUrl,
+                Username = info.Principal.FindFirstValue(ClaimTypes.Name)
+            }); ; 
+        }
+
+
+        /// <summary>
+        /// Контроллер для переадресации после прохождения авторизации внешним провайдером.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [AllowAnonymous]
+        public IActionResult RegisterExternal(ExternalLoginViewModel model)
+        {
+            return View(model);
+        }
+
+
+        /// <summary>
+        /// Контроллер после авторизации и нажатия на кнопку "Сохранить".
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+
+        [HttpPost]
+        [AllowAnonymous]
+        [ActionName("RegisterExternal")] 
+        public async Task<IActionResult> RegisterExternalConfirmed(ExternalLoginViewModel model)
+        {
+            //Пользователь действительно авторизировался через внешний провайдер.
+            var info =await _signInManager.GetExternalLoginInfoAsync();
+            if(info==null)
+            {
+                return RedirectToAction("Login");
+            }
+
+            //Пользователь подтвержден. Сохраняем пользователя в базу данных.
+            var user = new ApplicationUser(model.Username);
+            var result = await _userManager.CreateAsync(user);
+            //Успешно добавлен в БД.
+            if(result.Succeeded)
+            {
+                var calimsResult= 
+                    await _userManager.AddClaimAsync(user,new Claim(ClaimTypes.Role,RolesConst.User));
+
+                if(calimsResult.Succeeded)
+                {
+                    var identityResult = await _userManager.AddLoginAsync(user,info);
+                    if(identityResult.Succeeded)
+                    {
+                        //Авторизируем пользователя в нашем приложении.
+                        await _signInManager.SignInAsync(user,false);
+                        return RedirectToAction("", "UserPage");
+                    }
+                }
+            }
+            else
+            {
+                //Возвращаю сведения об ошибке.
+                IdentityError ir = result.Errors.First();
+                model.Error = ir.Description;
+
+                return View(model);
+            }
+
+
+            return View(model);
+        }
+
+
+       
+
+
+
+        
+
+        /// <summary>
+        /// Выход.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<IActionResult> LogoutAsync()
+        {
+            await _signInManager.SignOutAsync(); 
+            return Redirect("/Home/Index"); ;
+        }
+
+
+       
+
+     
+    }
+}

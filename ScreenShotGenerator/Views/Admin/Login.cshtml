@@ -1,0 +1,44 @@
+﻿@model LoginViewModel
+
+<h1>Login</h1>
+<div>
+    <h5>Авторизироваться через социальные сети.</h5>
+    <form asp-controller="Admin" asp-action="ExternalLogin" asp-route-returnUrl="@Model.ReturnUrl">
+        @foreach (var provider in Model.ExternalProviders)
+        {
+            <button type="submit" name="provider" value="@provider.Name">
+                @provider.DisplayName
+            </button>
+        }
+    </form>
+</div>
+<p>
+    <h5>Или через логин и пароль.</h5>
+</p>
+<div>
+    <form asp-controller="Admin" asp-action="Login" method="post">
+        <input hidden asp-for="ReturnUrl" />
+        <div asp-validation-summary="All"></div>
+        <table border="0" cellpadding="2" cellspacing="2">
+            <tr>
+                <td>Username</td>
+                <td>
+                    <input asp-for="Username" />
+                    <span asp-validation-for="Username"></span>
+                </td>
+            </tr>
+            <tr>
+                <td>Password</td>
+                <td>
+                    <input type="password"  asp-for="Password" />
+                    <span asp-validation-for="Password"></span>
+                </td>
+            </tr>
+            <tr>
+                <td>&nbsp;</td>
+                <td> <button type="submit">Войти</button></td>
+            </tr>
+        </table>
+    </form>
+</div>
+<a asp-controller="Home" asp-action="Index">Home</a>
