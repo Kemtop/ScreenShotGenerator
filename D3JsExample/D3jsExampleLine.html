@@ -1,0 +1,175 @@
+<!-- Code from d3-graph-gallery.com -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="./js/d3.min.js"></script>
+ <script src="./js/jquery-3.6.0.min.js"></script>
+<br><br>
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz"></div>
+
+
+<script>
+
+    function convertDt(data)
+	{
+	//Преобразовываю формат времени.
+			var jsonData=[ 
+			                
+				    ]
+			var k=0;
+			$.each(data,function(index, v){
+			
+			      var d={ 
+				            date:d3.timeParse("%Y-%m-%d")(v.date),
+							value:v.value
+						};				  
+			     jsonData[k]=d;
+				 k++;
+				
+			});
+			return jsonData
+			
+				
+			/*
+			$.each(jsonData,function(index, value){
+			
+				console.log(value.date);
+				console.log(value.value);
+			});
+			*/
+	}
+
+
+//Read the data  
+d3.csv("https://raw.githubusercontent.com/holtzy/data_to_viz/master/Example_dataset/3_TwoNumOrdered_comma.csv")
+  .then(
+        function(data) {
+		
+			var jsonData=convertDt(data);
+			console.log(jsonData);
+		      createChart(jsonData,"#my_dataviz","Использование памяти системы,Мб.","deepPink"); //"steelblue"
+			
+        	
+		}).catch(function(error){
+     // handle error 
+		console.log("Error:"+error);	 
+		})
+ 
+//Cоздает график.
+function createChart(jsonData,divId,titleText,lineColor)
+  { 
+	// set the dimensions and margins of the graph
+var margin = {top: 10, right: 30, bottom: 30, left: 60},
+    width = 460 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+
+// append the svg object to the body of the page
+var svg = d3.select(divId)
+  .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform",
+          "translate(" + margin.left + "," + margin.top + ")");
+		  
+		  
+	// Add X axis --> it is a date format
+    var x = d3.scaleTime()
+      .domain(d3.extent(jsonData, function(d) { return d.date; }))
+      .range([ 0, width ]);
+	  
+	  
+	  svg.append("text")
+        .attr("x", (width / 2))             
+        .attr("y", 10 - (margin.top / 2))
+        .attr("text-anchor", "middle")  
+        .style("font-size", "16px") 
+        .style("text-decoration", "underline")  
+        .text(titleText);
+	  
+    svg.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x));
+
+    // Add Y axis
+    var y = d3.scaleLinear()
+      .domain([0, d3.max(jsonData, function(d) { return +d.value; })])
+      .range([ height, 0 ]);
+    svg.append("g")
+      .call(d3.axisLeft(y));
+			
+
+  var hoverLineGroup = svg.append("g")
+          .attr("class", "hover-line");
+
+	var hoverTT = hoverLineGroup.append('text')
+                   .attr("class", "hover-tex capo")
+                   .attr('dy', "0.35em");
+				   
+    var hoverLine = hoverLineGroup
+                    .append("line")
+                        .attr("stroke", "#000")
+                        .attr("x1", 0).attr("x2", 0)
+                        .attr("y1", 0).attr("y2", height);
+						
+	var hoverTT2 = hoverLineGroup.append('text')
+                   .attr("class", "hover-text capo")
+                   .attr('dy', "0.55em");
+    //var cle = hoverLineGroup.append("circle").attr("r", 4.5);
+	
+	
+	  var rectHover = svg.append("rect")
+                  .data(jsonData)
+                  .attr("fill", "none")
+                  .attr("class", "overlay")
+                  .attr("width", width)
+                  .attr("height", height);
+	
+
+    // Add the line
+    svg.append("path")
+      .datum(jsonData)
+      .attr("fill", "none")
+      .attr("stroke",lineColor)
+      .attr("stroke-width", 1.5)
+      .attr("d", d3.line()
+        .x(function(d) { return x(d.date) })
+        .y(function(d) { return y(d.value) })
+        )
+    .append("title"); 
+	
+    svg.on("mouseout", hoverMouseOff)
+      .on("mousemove", hoverMouseOn);
+	  
+	 	  
+	    function hoverMouseOn(event) {
+					var mouse_x = d3.pointer(event)[0];
+					var mouse_y = d3.pointer(event)[1];
+					
+                    var graph_y = y.invert(mouse_y);
+                    var graph_x = x.invert(mouse_x);
+
+					
+                    hoverTT.text(Math.round(graph_y * 100)/100);
+                    hoverTT.attr('x', mouse_x+2);
+                    hoverTT.attr('y',mouse_y);
+							
+		     		 hoverTT2.text(d3.timeFormat("%H:%M:%S %d.%m.%Y")(graph_x))
+                       .attr('x', mouse_x)
+                       .attr('y', mouse_y + 10);
+                   // cle.attr('x', mouse_x).attr('y', mouse_y);
+					
+                    hoverLine.attr("x1", mouse_x).attr("x2", mouse_x)
+                    hoverLineGroup.style("opacity", 1);
+					
+					
+                }
+				
+				 function hoverMouseOff() {
+                        hoverLineGroup.style("opacity", 1e-6);
+                }
+	
+  } 
+</script>

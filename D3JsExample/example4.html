@@ -1,0 +1,287 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script
+    type="text/javascript"
+    src="https://d3js.org/d3.v3.js"
+  ></script>
+  <style id="compiled-css" type="text/css">
+      path {<!--from  w  w  w . dem o  2 s . c o m-->
+                stroke: steelblue;
+                stroke-width: 1;
+                fill: none;
+            }
+            .axis {
+                shape-rendering: crispEdges;
+            }
+            .x.axis line {
+                stroke: lightgrey;
+            }
+            .x.axis .minor {
+                stroke-opacity: .5;
+            }
+            .x.axis path {
+                display: none;
+            }
+            .y.axis line, .y.axis path {
+                fill: none;
+                stroke: #000;
+            }
+    
+  </style>
+</head>
+<body>
+    <div id="graph" class="aGraph" style="position:absolute;top:0px;left:0; float:left;"></div>
+<div id="graph1" class="aGraph" style="position:absolute;top:300px; left:0; float:left;"></div>
+    <script type='text/javascript'>
+ /* implementation heavily influenced by http://bl.ocks.org/1166403 */
+// define dimensions of graph
+            var m = [80, 80, 80, 80]; // margins
+            var w = 1000 - m[1] - m[3]; // width
+            var h = 400 - m[0] - m[2]; // height
+            var m1 = [80, 80, 80, 80]; // margins
+            var w1 = 1000 - m1[1] - m1[3]; // width
+            var h1 = 400 - m1[0] - m1[2]; // height
+// create a simple data array that we'll plot with a line (this array represents only the Y values, X will just be the index location)
+            var data = [3, 6, 2, 7, 5, 2, 0, 3, 8, 9, 2, 5, 9, 3, 6, 3, 6, 2, 7, 5, 2, 1, 3, 8, 9, 2, 5, 9, 2, 7];
+// X scale will fit all values from data[] within pixels 0-w
+            var x = d3.scale.linear().domain([0, data.length]).range([0, w]);
+// Y scale will fit values from 0-10 within pixels h-0 (Note the inverted domain for the y-scale: bigger is up!)
+            var y = d3.scale.linear().domain([0, 10]).range([h, 0]);
+// automatically determining max range can work something like this
+// var y = d3.scale.linear().domain([0, d3.max(data)]).range([h, 0]);
+// X scale will fit all values from data[] within pixels 0-w
+            var xScale = d3.scale.linear().domain([0, data.length]).range([0, w]);
+// Y scale will fit values from 0-10 within pixels h-0 (Note the inverted domain for the y-scale: bigger is up!)
+            var yScale = d3.scale.linear().domain([0, 10]).range([h, 0]);
+            // X scale will fit all values from data[] within pixels 0-w
+            var xScale1 = d3.scale.linear().domain([0, data.length]).range([0, w]);
+// Y scale will fit values from 0-10 within pixels h-0 (Note the inverted domain for the y-scale: bigger is up!)
+            var yScale1 = d3.scale.linear().domain([0, 10]).range([h, 0]);
+// create a line function that can convert data[] into x and y points
+            var line = d3.svg.line()
+// assign the X function to plot our line as we wish
+                    .x(function(d, i) {
+                        // verbose logging to show what's actually being done
+                        //console.log('Plotting X value for data point: ' + d + ' using index: ' + i + ' to be at: ' + x(i) + ' using our xScale.');
+                        // return the X coordinate where we want to plot this datapoint
+                        return x(i);
+                    })
+                    .y(function(d) {
+                        // verbose logging to show what's actually being done
+                        //console.log('Plotting Y value for data point: ' + d + ' to be at: ' + y(d) + " using our yScale.");
+                        // return the Y coordinate where we want to plot this datapoint
+                        return y(d);
+                    })
+// Add an SVG element with the desired dimensions and margin.
+            var graph = d3.select("#graph").append("svg:svg")
+                    .attr("width", w + m[1] + m[3])
+                    .attr("height", h + m[0] + m[2] + h1)
+                    .append("svg:g")
+                    .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
+// create yAxis
+            var xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(true);
+            var rect = graph.append("rect").attr({
+                w: 0,
+                h: 0,
+                width: w,
+                height: 2000,
+                fill: "#ffffff"
+            });
+// Add the x-axis.
+            graph.append("svg:g")
+                    .attr("class", "x axis")
+                    .attr("transform", "translate(0," + h + ")")
+                    .call(xAxis);
+// create left yAxis
+            var yAxisLeft = d3.svg.axis().scale(y).ticks(4).orient("left");
+// Add the y-axis to the left
+            graph.append("svg:g")
+                    .attr("class", "y axis")
+                    .attr("transform", "translate(-25,0)")
+                    .call(yAxisLeft);
+// Add the line by appending an svg:path element with the data line we created above
+// do this AFTER the axes above so that the line is above the tick-lines
+            var mainLine = graph.append("svg:path").attr("d", line(data));
+            var verticalLine = graph.append('line')
+// .attr('transform', 'translate(100, 50)')
+                    .attr({
+                        'x1': 0,
+                        'y1': 0,
+                        'x2': 0,
+                        'y2': 2000
+                    })
+                    .attr("stroke", "steelblue")
+                    .attr('class', 'verticalLine');
+            circle = graph.append("circle")
+                    .attr("opacity", 0)
+                    .attr({
+                        r: 6,
+                        fill: 'darkred'
+                    });
+            /*-----------------------------------------second graph------------------------------------*/
+// create a simple data array that we'll plot with a line (this array represents only the Y values, X will just be the index location)
+            var data1 = [2, 5, 9, 3, 6, 3, 6, 2, 7, 5, 2, 1, 3, 8, 9, 2, 5, 9, 2, 7, 3, 6, 2, 7, 5, 2, 0, 3, 8, 9, ];
+// X scale will fit all values from data[] within pixels 0-w
+            var x1 = d3.scale.linear().domain([0, data1.length]).range([0, w]);
+// Y scale will fit values from 0-10 within pixels h-0 (Note the inverted domain for the y-scale: bigger is up!)
+            var y1 = d3.scale.linear().domain([0, 10]).range([h, 0]);
+// automatically determining max range can work something like this
+// create a line function that can convert data[] into x and y points
+            var line1 = d3.svg.line()
+// assign the X function to plot our line as we wish
+                    .x(function(d, i) {
+                        // verbose logging to show what's actually being done
+                        //console.log('Plotting X value for data point: ' + d + ' using index: ' + i + ' to be at: ' + x(i) + ' using our xScale.');
+                        // return the X coordinate where we want to plot this datapoint
+                        return x1(i);
+                    })
+                    .y(function(d) {
+                        // verbose logging to show what's actually being done
+                        //console.log('Plotting Y value for data point: ' + d + ' to be at: ' + y(d) + " using our yScale.");
+                        // return the Y coordinate where we want to plot this datapoint
+                        return y1(d);
+                    })
+// Add an SVG element with the desired dimensions and margin.
+            var graph1 = d3.select("#graph1").append("svg:svg")
+                    .attr("width", w1 + m1[1] + m1[3])
+                    .attr("height", h1 + m1[0] + m1[2])
+                    .append("svg:g")
+                    .attr("transform", "translate(" + m1[3] + "," + m1[0] + ")");
+            var rect1 = graph1.append("rect").attr({
+                w: 0,
+                h: 0,
+                width: w,
+                height: 2000,
+                fill: "#ffffff",
+                opacity: 0
+            });
+// create yAxis
+            var xAxis1 = d3.svg.axis().scale(x1).tickSize(-h).tickSubdivide(true);
+            // Add the x-axis.
+            graph1.append("svg:g")
+                    .attr("class", "x axis")
+                    .attr("transform", "translate(0," + h1 + ")")
+                    .call(xAxis1);
+// create left yAxis
+            var yAxisLeft1 = d3.svg.axis().scale(y1).ticks(4).orient("left");
+// Add the y-axis to the left
+            graph1.append("svg:g")
+                    .attr("class", "y axis")
+                    .attr("transform", "translate(-25,0)")
+                    .call(yAxisLeft1);
+// Add the line by appending an svg:path element with the data line we created above
+// do this AFTER the axes above so that the line is above the tick-lines
+            var mainLine1 = graph1.append("svg:path").attr("d", line1(data1));
+            circle1 = graph1.append("circle")
+                    .attr("opacity", 0)
+                    .attr({
+                        r: 6,
+                        fill: 'darkred'
+                    });
+            /*---------------------------------------------------second graph------------------------------------*/
+            rect.on('mousemove', function() {
+                var xPos = d3.mouse(this)[0];
+                d3.select(".verticalLine").attr("transform", function() {
+                    return "translate(" + xPos + ",0)";
+                });
+                var pathLength = mainLine.node().getTotalLength();
+                var x = xPos;
+                var beginning = x,
+                        end = pathLength,
+                        target;
+                while (true) {
+                    target = Math.floor((beginning + end) / 2);
+                    pos = mainLine.node().getPointAtLength(target);
+                    if ((target === end || target === beginning) && pos.x !== x) {
+                        break;
+                    }
+                    if (pos.x > x)
+                        end = target;
+                    else if (pos.x < x)
+                        beginning = target;
+                    else
+                        break; //position found
+                }
+                circle.attr("opacity", 1)
+                        .attr("cx", x)
+                        .attr("cy", pos.y);
+                console.log("x and y coordinate where vertical line intersects graph: " + [pos.x, pos.y]);
+                console.log("data where vertical line intersects graph: " + [xScale.invert(pos.x), yScale.invert(pos.y)]);
+                var pathLength1 = mainLine1.node().getTotalLength();
+                var x1 = xPos;
+                var beginning1 = x1,
+                        end1 = pathLength1,
+                        target1;
+                while (true) {
+                    target1 = Math.floor((beginning1 + end1) / 2);
+                    pos1 = mainLine1.node().getPointAtLength(target1);
+                    if ((target1 === end1 || target1 === beginning1) && pos1.x !== x1) {
+                        break;
+                    }
+                    if (pos1.x > x1)
+                        end1 = target1;
+                    else if (pos1.x < x1)
+                        beginning1 = target1;
+                    else
+                        break; //position found
+                }
+                circle1.attr("opacity", 1)
+                        .attr("cx", x1)
+                        .attr("cy", pos1.y);
+                console.log("data where vertical line intersects graph2: " + [xScale1.invert(pos1.x), yScale1.invert(pos1.y)]);
+            });
+ rect1.on('mousemove', function() {
+                var xPos = d3.mouse(this)[0];
+                d3.select(".verticalLine").attr("transform", function() {
+                    return "translate(" + xPos + ",0)";
+                });
+                var pathLength = mainLine.node().getTotalLength();
+                var x = xPos;
+                var beginning = x,
+                        end = pathLength,
+                        target;
+                while (true) {
+                    target = Math.floor((beginning + end) / 2);
+                    pos = mainLine.node().getPointAtLength(target);
+                    if ((target === end || target === beginning) && pos.x !== x) {
+                        break;
+                    }
+                    if (pos.x > x)
+                        end = target;
+                    else if (pos.x < x)
+                        beginning = target;
+                    else
+                        break; //position found
+                }
+                circle.attr("opacity", 1)
+                        .attr("cx", x)
+                        .attr("cy", pos.y);
+                console.log("x and y coordinate where vertical line intersects graph: " + [pos.x, pos.y]);
+                console.log("data where vertical line intersects graph: " + [xScale.invert(pos.x), yScale.invert(pos.y)]);
+                var pathLength1 = mainLine1.node().getTotalLength();
+                var x1 = xPos;
+                var beginning1 = x1,
+                        end1 = pathLength1,
+                        target1;
+                while (true) {
+                    target1 = Math.floor((beginning1 + end1) / 2);
+                    pos1 = mainLine1.node().getPointAtLength(target1);
+                    if ((target1 === end1 || target1 === beginning1) && pos1.x !== x1) {
+                        break;
+                    }
+                    if (pos1.x > x1)
+                        end1 = target1;
+                    else if (pos1.x < x1)
+                        beginning1 = target1;
+                    else
+                        break; //position found
+                }
+                circle1.attr("opacity", 1)
+                        .attr("cx", x1)
+                        .attr("cy", pos1.y);
+                console.log("data where vertical line intersects graph2: " + [xScale1.invert(pos1.x), yScale1.invert(pos1.y)]);
+            });
+  </script>
+</body>
+</html>

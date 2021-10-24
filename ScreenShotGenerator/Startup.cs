@@ -127,6 +127,13 @@ namespace ScreenShotGenerator
             services.AddEntityFrameworkSqlite()
             .AddDbContext<DatabaseContext>();
 
+            /*
+               services.AddDbContext<ApplicationDbContext>(config =>
+            {
+                // config.UseNpgsql("Host=localhost;Port=5432;Database=ScreenShotServiceDb;Username=postgres;Password=926926");
+                config.UseNpgsql(psqlConStr);
+            })
+             */
 
 
 

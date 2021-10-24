@@ -16,20 +16,22 @@ using ScreenShotGenerator.Models;
 
 namespace ScreenShotGenerator.Controllers
 {
-    [Authorize]
+    //[Authorize]
     public class AdminController : Controller
     {
         //Для работы с базой данных.
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly ApplicationDbContext _dbContext;
 
 
         public AdminController(UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager )
+            SignInManager<ApplicationUser> signInManager,
+            ApplicationDbContext dbContext)
         {
             _userManager = userManager;
             _signInManager = signInManager;
-
+            _dbContext = dbContext;
         }
 
 
@@ -37,10 +39,14 @@ namespace ScreenShotGenerator.Controllers
         /// Контроллер админ страницы.
         /// </summary>
         /// <returns></returns>
-        [Authorize(Roles = RolesConst.Admin)]
+       // [Authorize(Roles = RolesConst.Admin)]
         public IActionResult Index()
         {
-            return View();
+            SystemSettingModel model = new SystemSettingModel();
+            model.tasksAmount = 1;
+            model.clearCashInterval = 2;
+            model.browserAmount = 3;
+            return View(model);
         }
 
         /// <summary>
@@ -70,13 +76,84 @@ namespace ScreenShotGenerator.Controllers
         }
 
 
+       
+        /// <summary>
+        /// Возвращает данные о состоянии памяти.
+        /// </summary>
+        /// <returns></returns>
+        public JsonResult GetMemoryUsage()
+        {
+            List<mJsonChart> memoryUsages = new List<mJsonChart>();
+
+            foreach(var line in _dbContext.performanceInfo)
+            {
+                memoryUsages.Add(new mJsonChart { value = line.memoryUsage, date = line.date });
+            }
+                                  
+
+            //Возвращает массив.
+            return Json(memoryUsages);
+        }
 
         /// <summary>
-        /// Непосредственно контролер на который происходит редирект, если пользователь не авторизировался.
+        /// Возвращает данные о нагрузке процессора.
         /// </summary>
-        /// <param name="returnUrl"></param>
         /// <returns></returns>
-        [AllowAnonymous]
+        public JsonResult GetCPUusage()
+        {
+            List<mJsonChart> cpuLoad = new List<mJsonChart>();
+
+            foreach (var line in _dbContext.performanceInfo)
+            {
+                cpuLoad.Add(new mJsonChart { value = (int)line.cpuLoad, date = line.date });
+           }
+
+
+            //Возвращает массив.
+            return Json(cpuLoad);
+        }
+
+        /// <summary>
+        /// Возвращает данные о количестве ожидающих задач в пуле.
+        /// </summary>
+        /// <returns></returns>
+        public JsonResult GetPoolWaitTask()
+        {
+             List<mJsonChart> poolWait = new List<mJsonChart>();
+
+            foreach (var line in _dbContext.performanceInfo)
+            {
+                poolWait.Add(new mJsonChart { value = line.poolWaiterTask, date = line.date });
+            }
+
+
+            //Возвращает массив.
+            return Json(poolWait);
+        }
+
+        /// <summary>
+        /// Сохраняет настройки сервиса.
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        [HttpPost]
+        public async Task<IActionResult> Index(SystemSettingModel model)
+        {
+            if ((model == null)||(!ModelState.IsValid))
+            {
+                return View(model);
+            }
+
+            return View(model);
+        }
+
+
+            /// <summary>
+            /// Непосредственно контролер на который происходит редирект, если пользователь не авторизировался.
+            /// </summary>
+            /// <param name="returnUrl"></param>
+            /// <returns></returns>
+            [AllowAnonymous]
         public async Task<IActionResult> Login(string returnUrl)
         {
             //Для авторизации через соц сети.

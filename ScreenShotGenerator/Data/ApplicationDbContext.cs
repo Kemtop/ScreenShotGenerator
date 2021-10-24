@@ -20,7 +20,7 @@ namespace ScreenShotGenerator.Data
                 Database.Migrate();
         }
 
-       // public DbSet<ApplicationUser> Users { get; set; } 
+        public DbSet<mPerformanceInfo> performanceInfo { get; set; } 
 
     }
 }

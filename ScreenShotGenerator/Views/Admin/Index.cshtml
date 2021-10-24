@@ -1,10 +1,252 @@
-﻿<p> Привет администратор.</p>
+﻿
 
-<p>
-    <a href="/Admin/CashImages">Просмотр кеша системы.</a>
-</p> 
+<div class="btn-group">
+    <a asp-controller="Admin" asp-action="CashImages" class="btn btn-primary">Просмотр кеша системы</a>
+    <a asp-controller="Home" asp-action="Index" class="btn btn-primary" aria-current="page">Домой</a>
+    <a asp-controller="Admin" asp-action="Logout" class="btn btn-primary">Выйти</a>
 
-<p>
-    <a asp-controller="Home" asp-action="Index">Домой</a>
-    <a asp-controller="Admin" asp-action="Logout">Выйти</a>
-</p>
+</div>
+<br>
+<br>
+<p> Привет администратор.</p>
+<br>
+<br>
+
+
+<table>
+    <tr>
+        <td><div id="charMemoryUsage"></div></td>
+        <td><div id="charCPUusage"></div></td>
+    </tr>
+    <tr>
+        <td><div id="charPoolTaskWait"></div></td>
+        <td>
+            Количество элементов в кеши:
+            Свободно на диске:
+        </td>
+    </tr>
+
+</table>
+<button type="button" class="btn btn-info">Перезапустить браузеры.</button>
+<br>
+
+@model SystemSettingModel
+<form asp-controller="Admin" asp-action="Index" method="post">
+    <div class="mb-3">
+        <label for="exampleInputEmail1" class="form-label">Период очистки кеша сервиса, в часах</label>
+        <input asp-for="clearCashInterval" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp">
+        <span asp-validation-for="clearCashInterval"></span>
+    </div>
+    <div class="mb-3">
+        <label for="exampleInputPassword1" class="form-label">Количество работающих браузеров.</label>
+        <input asp-for="browserAmount" class="form-control" id="exampleInputPassword1">
+        <div id="emailHelp" class="form-text">Требует перезагрузки браузеров.</div>
+        <span asp-validation-for="browserAmount"></span>
+    </div>
+    <div class="mb-3">
+        <label for="exampleInputPassword1" class="form-label">Количество задач обрабатываемых одним браузером.</label>
+        <input asp-for="tasksAmount" class="form-control" id="exampleInputPassword1">
+        <div id="emailHelp" class="form-text">
+            Количество задач,в пуле задач, которые один браузер резервирует и начинает обрабатывать.
+            Требует перезагрузки браузеров.
+        </div>
+        <span asp-validation-for="tasksAmount"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Сохранить</button>
+</form>
+
+
+
+
+@section Scripts{
+    <script src="./js/jquery-3.6.0.min.js"></script>
+    <script src="./js/d3.js"></script>
+    <script type="text/javascript">
+
+        function convertDt(data) {
+            //Преобразовываю формат времени.
+            var jsonData = [
+
+            ]
+            var k = 0;
+            $.each(data, function (index, v) {
+
+                var d = {//%H:%M:%S %d.%m.%Y" T%H:%M:%S
+                    //date: d3.timeParse("%Y-%m-%d")(v.date),
+                    date: new Date(v.date),
+                    value: v.value
+                };
+                jsonData[k] = d;
+                k++;
+
+            });
+            return jsonData
+
+        }
+
+
+        $.ajax({
+            type: "GET",
+            url: "/Admin/GetMemoryUsage",
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (result) {
+
+                console.log(result);
+                var jsonData = convertDt(result);
+                console.log(jsonData);
+                createChart(jsonData, "#charMemoryUsage", "Использование памяти системы,Мб.", "steelblue");
+            },
+            error: function (msg) {
+                $("#result").text(msg);
+            }
+        });
+
+
+
+        $.ajax({
+            type: "GET",
+            url: "/Admin/GetCPUusage",
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (result) {
+                var jsonData = convertDt(result);
+                createChart(jsonData, "#charCPUusage", "Нагрузка процессора,%.", "deepPink");
+            },
+            error: function (msg) {
+                $("#result").text(msg);
+            }
+        });
+
+
+        $.ajax({
+            type: "GET",
+            url: "/Admin/GetPoolWaitTask",
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (result) {
+                var jsonData = convertDt(result);
+                createChart(jsonData, "#charPoolTaskWait", "Количество ожидающих задач.", "lightseagreen");
+            },
+            error: function (msg) {
+                $("#result").text(msg);
+            }
+        });
+
+
+        //Cоздает график.
+        function createChart(jsonData, divId, titleText, lineColor) {
+            // set the dimensions and margins of the graph
+            var margin = { top: 10, right: 30, bottom: 30, left: 60 },
+                width = 460 - margin.left - margin.right,
+                height = 400 - margin.top - margin.bottom;
+
+            // append the svg object to the body of the page
+            var svg = d3.select(divId)
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform",
+                    "translate(" + margin.left + "," + margin.top + ")");
+
+
+            // Add X axis --> it is a date format
+            var x = d3.scaleTime()
+                .domain(d3.extent(jsonData, function (d) { return d.date; }))
+                .range([0, width]);
+
+
+            svg.append("text")
+                .attr("x", (width / 2))
+                .attr("y", 10 - (margin.top / 2))
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("text-decoration", "underline")
+                .text(titleText);
+
+            svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x));
+
+            // Add Y axis
+            var y = d3.scaleLinear()
+                .domain([0, d3.max(jsonData, function (d) { return +d.value; })])
+                .range([height, 0]);
+            svg.append("g")
+                .call(d3.axisLeft(y));
+
+
+            var hoverLineGroup = svg.append("g")
+                .attr("class", "hover-line");
+
+            var hoverTT = hoverLineGroup.append('text')
+                .attr("class", "hover-tex capo")
+                .attr('dy', "0.35em");
+
+            var hoverLine = hoverLineGroup
+                .append("line")
+                .attr("stroke", "#000")
+                .attr("x1", 0).attr("x2", 0)
+                .attr("y1", 0).attr("y2", height);
+
+            var hoverTT2 = hoverLineGroup.append('text')
+                .attr("class", "hover-text capo")
+                .attr('dy', "0.55em");
+            //var cle = hoverLineGroup.append("circle").attr("r", 4.5);
+
+
+            var rectHover = svg.append("rect")
+                .data(jsonData)
+                .attr("fill", "none")
+                .attr("class", "overlay")
+                .attr("width", width)
+                .attr("height", height);
+
+
+            // Add the line
+            svg.append("path")
+                .datum(jsonData)
+                .attr("fill", "none")
+                .attr("stroke", lineColor)
+                .attr("stroke-width", 1.5)
+                .attr("d", d3.line()
+                    .x(function (d) { return x(d.date) })
+                    .y(function (d) { return y(d.value) })
+                )
+                .append("title");
+
+            svg.on("mouseout", hoverMouseOff)
+                .on("mousemove", hoverMouseOn);
+
+
+            function hoverMouseOn(event) {
+                var mouse_x = d3.pointer(event)[0];
+                var mouse_y = d3.pointer(event)[1];
+
+                var graph_y = y.invert(mouse_y);
+                var graph_x = x.invert(mouse_x);
+
+
+                hoverTT.text(Math.round(graph_y * 100) / 100);
+                hoverTT.attr('x', mouse_x + 2);
+                hoverTT.attr('y', mouse_y);
+
+                hoverTT2.text(d3.timeFormat("%H:%M:%S %d.%m.%Y")(graph_x))
+                    .attr('x', mouse_x)
+                    .attr('y', mouse_y + 10);
+                // cle.attr('x', mouse_x).attr('y', mouse_y);
+
+                hoverLine.attr("x1", mouse_x).attr("x2", mouse_x)
+                hoverLineGroup.style("opacity", 1);
+
+
+            }
+
+            function hoverMouseOff() {
+                hoverLineGroup.style("opacity", 1e-6);
+            }
+
+        }
+    </script>
+}

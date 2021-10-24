@@ -1,0 +1,186 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script
+    type="text/javascript"
+    src="https://d3js.org/d3.v3.js"
+  ></script>
+</head><!-- ww w  .  de  m  o  2s .  c  o  m-->
+<body>
+    <body>
+  <div id="line_chart"></div>
+  </body>
+    <script type='text/javascript'>
+	
+	// from https://www.demo2s.com/javascript/javascript-d3-js-line-chart-with-tooltip-and-vertical-line-of-hover.html
+data = [
+   {
+  "class": "22",
+  "number": "11"
+  },
+  {
+  "class": "35",
+  "number": "1"
+  },
+   {
+  "class": "38",
+  "number": "4"
+  },
+  {
+  "class": "42",
+  "number": "7"
+  },
+  {
+  "class": "43",
+  "number": "1"
+  },
+   {
+  "class": "48",
+  "number": "5"
+  },
+  {
+  "class": "55",
+  "number": "10"
+  },
+  {
+  "class": "61",
+  "number": "8"
+  },
+   {
+  "class": "65",
+  "number": "9"
+  },
+  {
+  "class": "71",
+  "number": "1"
+  },
+  {
+  "class": "72",
+  "number": "9"
+  },
+   {
+  "class": "80",
+  "number": "21"
+  }
+]
+margin = {
+                    top: 20,
+                    right: 20,
+                    bottom: 20,
+                    left: 50
+                };
+				
+        var width = 500,
+                    height = 500;
+        var vis = d3.select("#line_chart").append("svg")
+                            .attr("width", width + margin.left + margin.right)
+                            .attr("height", height + margin.top + margin.bottom);
+        max_x = 0, max_y = 0, min = 100;
+                for(i=0; i < data.length; i++){
+                    max_y = Math.max(max_y, data[i].number);
+                    max_x = Math.max(max_x, data[i].class);
+                    min = Math.min(min, data[i].class);
+                }
+				
+				
+                    xScale = d3.scale.linear().range([margin.left, width - margin.right]).domain([min, max_x]),
+                    yScale = d3.scale.linear().range([height - margin.top, margin.bottom]).domain([0, max_y]),
+                    xAxis = d3.svg.axis().scale(xScale),
+                    yAxis = d3.svg.axis()
+                    .scale(yScale)
+                    .orient("left");
+                vis.append("svg:g")
+                    .attr("class", "x axis")
+                    .attr("transform", "translate(0," + (height - margin.bottom) + ")")
+                    .call(xAxis);
+                vis.append("svg:g")
+                    .attr("class", "y axis")
+                    .attr("transform", "translate(" + (margin.left) + ",0)")
+                    .call(yAxis);
+					
+					
+                var lineGen = d3.svg.line()
+                    .x(function(d) {
+                        return xScale(d.class);
+                    })
+                    .y(function(d) {
+                        return yScale(d.number);
+                    })
+                    .interpolate("basis");
+					
+					
+					
+                var pth = vis.append('svg:path')
+                    .attr('d', lineGen(data))
+                    .attr('stroke', '#000')
+                    .attr('stroke-width', 3.5)
+                    .attr('fill', 'none');
+                var totalLength = pth.node().getTotalLength();
+                pth
+                  .attr("stroke-dasharray", totalLength + " " + totalLength)
+                  .attr("stroke-dashoffset", totalLength)
+                  .transition()
+                    .duration(2400)
+                    .ease("linear")
+                    .attr("stroke-dashoffset", 0);
+                //Line chart mouse over
+                var hoverLineGroup = vis.append("g")
+                                    .attr("class", "hover-line");
+                var hoverLine = hoverLineGroup
+                    .append("line")
+                        .attr("stroke", "#000")
+                        .attr("x1", 10).attr("x2", 10)
+                        .attr("y1", 0).attr("y2", height);
+                var hoverTT = hoverLineGroup.append('text')
+                   .attr("class", "hover-tex capo")
+                   .attr('dy', "0.35em");
+				   
+				   
+                var cle = hoverLineGroup.append("circle")
+                    .attr("r", 4.5);
+                var hoverTT2 = hoverLineGroup.append('text')
+                   .attr("class", "hover-text capo")
+                   .attr('dy', "0.55em");
+                hoverLineGroup.style("opacity", 1e-6);
+                var rectHover = vis.append("rect")
+                  .data(data)
+                  .attr("fill", "none")
+                  .attr("class", "overlay")
+                  .attr("width", width)
+                  .attr("height", height);
+				  
+				  
+                vis
+                    .on("mouseout", hoverMouseOff)
+                    .on("mousemove", hoverMouseOn);
+					
+                        var bisectDate = d3.bisector(function(d) { return d.class; }).left;
+                function hoverMouseOn() {
+                    var mouse_x = d3.mouse(this)[0];
+                    var mouse_y = d3.mouse(this)[1];
+                    var graph_y = yScale.invert(mouse_y);
+                    var graph_x = xScale.invert(mouse_x);
+                     var mouseDate = xScale.invert(mouse_x);
+                    var i = bisectDate(data, mouseDate); // returns the index to the current data item
+                    var d0 = data[i - 1]
+                    var d1 = data[i];
+                    // work out which date value is closest to the mouse
+                    var d = mouseDate - d0[0] > d1[0] - mouseDate ? d1 : d0;
+                    hoverTT.text("Marks: " + Math.round(graph_x * 100)/100);
+                    hoverTT.attr('x', mouse_x);
+                    hoverTT.attr('y', yScale(d.number));
+                    hoverTT2.text("Frequency: " + Math.round(d.number * 100)/100)
+                       .attr('x', mouse_x)
+                       .attr('y', yScale(d.number) + 10);
+                    cle
+                      .attr('x', mouse_x)
+                      .attr('y', mouse_y);
+                    hoverLine.attr("x1", mouse_x).attr("x2", mouse_x)
+                    hoverLineGroup.style("opacity", 1);
+                }
+                function hoverMouseOff() {
+                        hoverLineGroup.style("opacity", 1e-6);
+                }
+  </script>
+</body>
+</html>

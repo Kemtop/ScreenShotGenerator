@@ -61,8 +61,9 @@ namespace ScreenShotGenerator.Controllers
           
         }
 
+       
 
-         public IActionResult Privacy()
+        public IActionResult Privacy()
         {
             return View();
         }
