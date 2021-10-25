@@ -1,7 +1,8 @@
-﻿
+﻿@model SystemSettingModel
 
 <div class="btn-group">
     <a asp-controller="Admin" asp-action="CashImages" class="btn btn-primary">Просмотр кеша системы</a>
+    <a asp-controller="Admin" asp-action="ShowLogs" class="btn btn-primary">Логи</a>
     <a asp-controller="Home" asp-action="Index" class="btn btn-primary" aria-current="page">Домой</a>
     <a asp-controller="Admin" asp-action="Logout" class="btn btn-primary">Выйти</a>
 
@@ -9,9 +10,19 @@
 <br>
 <br>
 <p> Привет администратор.</p>
-<br>
-<br>
+<p>@Model.InfoMessage</p>
 
+@if (Model.ErrorMessage != null)
+{
+    <br>
+    <br>
+}
+<h5 class="text-danger"><strong>@Model.ErrorMessage</strong></h5>
+@if (Model.ErrorMessage != null)
+{
+    <br>
+    <br>
+}
 
 <table>
     <tr>
@@ -21,40 +32,54 @@
     <tr>
         <td><div id="charPoolTaskWait"></div></td>
         <td>
-            Количество элементов в кеши:
-            Свободно на диске:
+            <table>
+                <tr>
+                    <td>Количество элементов в кеши:@Model.cacheElementsCnt</td>
+                </tr>
+                <tr>
+                    <td>Количество обрабатываемых задач:@Model.curentElementsInProcessCnt</td>
+                </tr>
+            </table>        
+           
         </td>
     </tr>
 
 </table>
-<button type="button" class="btn btn-info">Перезапустить браузеры.</button>
+<br>
+<br>
+<form>
+    <button name="button" value="rebootBrowser"  asp-action="rebootBrowser" class="btn btn-info">Перезапустить браузеры.</button>
+</form>
+<br>
 <br>
 
-@model SystemSettingModel
-<form asp-controller="Admin" asp-action="Index" method="post">
-    <div class="mb-3">
-        <label for="exampleInputEmail1" class="form-label">Период очистки кеша сервиса, в часах</label>
-        <input asp-for="clearCashInterval" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp">
-        <span asp-validation-for="clearCashInterval"></span>
-    </div>
-    <div class="mb-3">
-        <label for="exampleInputPassword1" class="form-label">Количество работающих браузеров.</label>
-        <input asp-for="browserAmount" class="form-control" id="exampleInputPassword1">
-        <div id="emailHelp" class="form-text">Требует перезагрузки браузеров.</div>
-        <span asp-validation-for="browserAmount"></span>
-    </div>
-    <div class="mb-3">
-        <label for="exampleInputPassword1" class="form-label">Количество задач обрабатываемых одним браузером.</label>
-        <input asp-for="tasksAmount" class="form-control" id="exampleInputPassword1">
-        <div id="emailHelp" class="form-text">
-            Количество задач,в пуле задач, которые один браузер резервирует и начинает обрабатывать.
-            Требует перезагрузки браузеров.
-        </div>
-        <span asp-validation-for="tasksAmount"></span>
-    </div>
-    <button type="submit" class="btn btn-primary">Сохранить</button>
-</form>
 
+
+<div style="width:300px;">
+    <form asp-controller="Admin" asp-action="Index" method="post">
+        <div class="mb-3">
+            <label for="exampleInputEmail1" class="form-label">Период очистки кеша сервиса, в часах</label>
+            <input asp-for="clearCashInterval" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp">
+            <span asp-validation-for="clearCashInterval" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label for="exampleInputPassword1" class="form-label">Количество работающих браузеров.</label>
+            <input asp-for="browserAmount" class="form-control" id="exampleInputPassword1">
+            <div id="emailHelp" class="form-text">Требует перезагрузки браузеров.</div>
+            <span asp-validation-for="browserAmount" class="text-danger"></span>
+        </div>
+        <div class="mb-3">
+            <label for="exampleInputPassword1" class="form-label">Количество задач обрабатываемых одним браузером.</label>
+            <input asp-for="tasksAmount" class="form-control" id="exampleInputPassword1">
+            <div id="emailHelp" class="form-text">
+                Количество задач,в пуле задач, которые один браузер резервирует и начинает обрабатывать.
+                Требует перезагрузки браузеров.
+            </div>
+            <span asp-validation-for="tasksAmount" class="text-danger"></span>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </form>
+</div>
 
 
 

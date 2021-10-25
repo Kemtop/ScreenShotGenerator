@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using ScreenShotGenerator.Data;
 using ScreenShotGenerator.Entities;
 using ScreenShotGenerator.Models;
+using ScreenShotGenerator.Services;
 
 namespace ScreenShotGenerator.Controllers
 {
@@ -24,14 +25,17 @@ namespace ScreenShotGenerator.Controllers
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ApplicationDbContext _dbContext;
 
+        //Интерфейс для взаимодействия с сервисом скрин шоттов.
+        private readonly IScreenShoter _screenShoter;
 
         public AdminController(UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
-            ApplicationDbContext dbContext)
+            ApplicationDbContext dbContext, IScreenShoter screenShoter)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _dbContext = dbContext;
+            _screenShoter = screenShoter;
         }
 
 
@@ -42,10 +46,10 @@ namespace ScreenShotGenerator.Controllers
        // [Authorize(Roles = RolesConst.Admin)]
         public IActionResult Index()
         {
-            SystemSettingModel model = new SystemSettingModel();
-            model.tasksAmount = 1;
-            model.clearCashInterval = 2;
-            model.browserAmount = 3;
+            //Получаю сведения о настройках сервиса.
+            SystemSettingModel model = _screenShoter.getSettings();
+            model.InfoMessage = "Сейчас " + DateTime.Now.ToString("hh:mm:ss dd.MM.yyyy");
+
             return View(model);
         }
 
@@ -139,21 +143,37 @@ namespace ScreenShotGenerator.Controllers
         [HttpPost]
         public async Task<IActionResult> Index(SystemSettingModel model)
         {
-            if ((model == null)||(!ModelState.IsValid))
+            if (model == null) return View(model);
+
+            model.InfoMessage = "Сейчас "+DateTime.Now.ToString("hh:mm:ss dd:MM:yyyy");
+
+            if(!ModelState.IsValid)
             {
+                model.ErrorMessage = "Введены не верные данные. Настройки не сохранены.";
                 return View(model);
             }
+
+            //Сохраняю настройки.
+            _screenShoter.setSettings(model);
+            model.InfoMessage += " Настройки успешно сохранены.";
 
             return View(model);
         }
 
+
+                
+        //[HttpPost]
+        public async Task<IActionResult> rebootBrowser(string button)
+        {
+            return View();
+        }
 
             /// <summary>
             /// Непосредственно контролер на который происходит редирект, если пользователь не авторизировался.
             /// </summary>
             /// <param name="returnUrl"></param>
             /// <returns></returns>
-            [AllowAnonymous]
+        [AllowAnonymous]
         public async Task<IActionResult> Login(string returnUrl)
         {
             //Для авторизации через соц сети.

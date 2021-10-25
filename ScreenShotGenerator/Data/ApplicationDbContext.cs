@@ -20,7 +20,15 @@ namespace ScreenShotGenerator.Data
                 Database.Migrate();
         }
 
+        /// <summary>
+        /// Данные о производительности системы.
+        /// </summary>
         public DbSet<mPerformanceInfo> performanceInfo { get; set; } 
+
+        /// <summary>
+        /// Настройки сервиса.
+        /// </summary>
+        public DbSet<mServiceSettings> serviceSettings { get; set; }
 
     }
 }

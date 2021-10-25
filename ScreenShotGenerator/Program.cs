@@ -37,9 +37,10 @@ namespace ScreenShotGenerator
                 {
                     webBuilder.UseStartup<Startup>();
                 })
-            .ConfigureServices(s=>s.AddHostedService<perfomanceService>());
-        
-        //.ConfigureServices(services=>services.AddHostedService<BackgroundWorker>());
+            //Сервис мониторинга производительности.
+            .ConfigureServices(s=>s.AddHostedService<perfomanceService>())
+            //Сервис скринов.
+        .ConfigureServices(services=>services.AddHostedService<BackgroundWorker>());
 
 
      

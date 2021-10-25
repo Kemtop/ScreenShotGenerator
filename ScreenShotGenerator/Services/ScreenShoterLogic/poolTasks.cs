@@ -27,6 +27,26 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
             pool.Add(job);
         }
 
+
+        /// <summary>
+        /// Количество элементов в пуле.
+        /// </summary>
+        /// <returns></returns>
+        public int cacheCnt()
+        {
+            return pool.Count();
+        }
+
+        /// <summary>
+        /// Количество обрабатываемых элементов на данный момент.
+        /// </summary>
+        public int curentElementsInProcessCnt()
+        {
+            IEnumerable<mJobPool> ret = pool.Where(x => x.status == 1);
+            return ret.ToList().Count;
+        }
+
+
         /// <summary>
         /// Возвращает firstCnt элементов требующих обработки.
         /// </summary>

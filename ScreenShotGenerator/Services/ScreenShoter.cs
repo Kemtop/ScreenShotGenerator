@@ -14,7 +14,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Serilog;
-
+using ScreenShotGenerator.Models;
+using ScreenShotGenerator.Data;
+using Microsoft.Extensions.DependencyInjection;
+using ScreenShotGenerator.Entities;
 
 namespace ScreenShotGenerator.Services
 {
@@ -23,6 +26,8 @@ namespace ScreenShotGenerator.Services
         private readonly IHttpContextAccessor _context; 
         private readonly ILogger<Worker> logger;
         private readonly DatabaseContext _databaseContext = new DatabaseContext();
+
+        private readonly IServiceScopeFactory scopeFactory;
 
         //Синхронизация потоков.
         static object locker = new object();
@@ -52,13 +57,17 @@ namespace ScreenShotGenerator.Services
 
         int poolBrowserSize = 1; //Количество запущенных браузеров.
         int browserTasksPerThread=5; //Количество задач из пула которые браузер обрабатывает за раз.
+        int clearCashInterval = 10; //Интервал очистки кеша, в часах.
 
 
-
-        public ScreenShoter(ILogger<Worker> logger, IHttpContextAccessor context)
+        public ScreenShoter(ILogger<Worker> logger,
+            IHttpContextAccessor context,
+            IServiceScopeFactory scopeFactory)
         {
             this.logger = logger;
             _context = context;
+            this.scopeFactory = scopeFactory;
+
             poolTask = new poolTasks();
             poolTask.tmpDir = tmpDir; //Директория для хранения скриншотов.
 
@@ -71,9 +80,30 @@ namespace ScreenShotGenerator.Services
                .WriteTo.File(@"./Logs/log.txt", rollingInterval: RollingInterval.Day, 
                outputTemplate:"{Timestamp:HH:mm:ss.fff} [{Level}] {Message}{NewLine}{Exception}")
                .CreateLogger();
-                       
+
+
+            //Чтение настроек сервиса.
+            readSettingsFromDb();
         }
 
+        /// <summary>
+        /// Возвращает настройки сервиса для отображения на админ панеле.
+        /// </summary>
+        /// <returns></returns>
+        public SystemSettingModel getSettings()
+        {
+            SystemSettingModel m = new SystemSettingModel();
+            m.browserAmount = poolBrowserSize;  //Количество запущенных браузеров.
+            m.tasksAmount= browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
+            m.clearCashInterval=clearCashInterval; //Интервал очистки кеша, в часах.
+            m.cacheElementsCnt = poolCache.cacheCnt();
+
+            //Количество элементов обрабатываемых на данный момент.
+            m.curentElementsInProcessCnt=poolTask.curentElementsInProcessCnt();
+
+            return m;
+        }
+              
         /// <summary>
         /// Запускает сервис.
         /// </summary>
@@ -83,7 +113,7 @@ namespace ScreenShotGenerator.Services
         {
             await Task.Delay(2000);
             Log.Information("Running service...");
-            createBrowserPool();//Создаем пул браузеров.
+            //createBrowserPool();//Создаем пул браузеров.
             Log.Information("It running.");
 
 
@@ -369,7 +399,79 @@ namespace ScreenShotGenerator.Services
 
             }
         }
+
+        /// <summary>
+        /// Возвращает список имен параметров настройки сервиса.
+        /// </summary>
+        /// <returns></returns>
+        private Dictionary<string, string> returnSettingsName()
+        {
+            Dictionary<string, string> settings = new Dictionary<string, string>();
+            //Названия настроек.
+            settings.Add("poolBrowserSize", "");
+            settings.Add("browserTasksPerThread", "");
+            settings.Add("clearCashInterval", "");
+
+            return settings;
+        }
+
+        /// <summary>
+        /// Чтение настроек сервиса.
+        /// </summary>
+        private void readSettingsFromDb()
+        {
+            using (var scope = scopeFactory.CreateScope())
+            {
+                ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                //Возвращает список имен параметров настройки сервиса.
+                Dictionary<string, string> settings = returnSettingsName();
                 
+                foreach(KeyValuePair<string,string> item in settings)
+                {
+                   settings[item.Key]= dbContext.serviceSettings.Where(x=>x.Name==item.Key).
+                        FirstOrDefault().Value;
+                }
+
+               poolBrowserSize=Convert.ToInt32(settings["poolBrowserSize"]);  //Количество запущенных браузеров.
+               //Количество задач из пула которые браузер обрабатывает за раз.
+               browserTasksPerThread = Convert.ToInt32(settings["browserTasksPerThread"]);
+                //Интервал очистки кеша, в часах.
+                clearCashInterval = Convert.ToInt32(settings["clearCashInterval"]); 
+            }             
+          
+        }
+
+        /// <summary>
+        /// Сохраняет настройки в БД.
+        /// </summary>
+        /// <param name="m"></param>
+        public void setSettings(SystemSettingModel m)
+        {
+            //Возвращает список имен параметров настройки сервиса.
+            Dictionary<string, string> settings = returnSettingsName();
+
+            //Передаю  новые значения.
+            settings["poolBrowserSize"] =m.browserAmount.ToString();  //Количество запущенных браузеров.
+            settings["browserTasksPerThread"] = m.tasksAmount.ToString(); //Количество задач из пула которые браузер обрабатывает за раз.
+            settings["clearCashInterval"] = m.clearCashInterval.ToString(); //Интервал очистки кеша, в часах.
+       
+            using (var scope = scopeFactory.CreateScope())
+            {
+                ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+             
+                foreach (KeyValuePair<string, string> item in settings)
+                {
+                    //Получаю объект с нужным ключем.
+                    mServiceSettings line = dbContext.serviceSettings.Where(x => x.Name == item.Key).
+                         FirstOrDefault();
+                    line.Value = settings[item.Key];
+                }
+
+                dbContext.SaveChanges();
+            }            
+        }
+
 
     }
 }

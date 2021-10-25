@@ -19,8 +19,7 @@ namespace ScreenShotGenerator.perfomenceService
 
         private readonly IServiceScopeFactory scopeFactory;
 
-        private ApplicationDbContext _dbContext;
-
+       
         public perfomanceService(IServiceScopeFactory scopeFactory)
         {
             this.scopeFactory = scopeFactory;

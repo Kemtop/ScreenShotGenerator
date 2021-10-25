@@ -1,4 +1,5 @@
-﻿using ScreenShotGenerator.Services.ScreenShoterLogic;
+﻿using ScreenShotGenerator.Models;
+using ScreenShotGenerator.Services.ScreenShoterLogic;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,8 +17,21 @@ namespace ScreenShotGenerator.Services
         /// <returns></returns>
         Task runService(CancellationToken cancellationToken);
         Task stopService(CancellationToken cancellationToken);
+
         //Запуск процесса создания скринов.
         List<mUserJson> runJob(string[] url,string userIP);
-       
+
+        /// <summary>
+        /// Возвращает настройки сервиса.
+        /// </summary>
+        /// <returns></returns>
+        SystemSettingModel getSettings();
+
+        /// <summary>
+        /// Задает настройки сервиса.
+        /// </summary>
+        /// <returns></returns>
+        void setSettings(SystemSettingModel m);
+
     }
 }

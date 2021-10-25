@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ScreenShotGenerator.Data;
 using ScreenShotGenerator.Services;
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ namespace ScreenShotGenerator
       
         //Интерфейс скрин шоттера.
         private readonly IScreenShoter _screenShoter;
+        private readonly ApplicationDbContext dbContext;// = new DatabaseContext();
 
         public BackgroundWorker(IScreenShoter screenShoter)
         {          
