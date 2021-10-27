@@ -18,16 +18,15 @@ namespace ScreenShotGenerator
       
         //Интерфейс скрин шоттера.
         private readonly IScreenShoter _screenShoter;
-        private readonly ApplicationDbContext dbContext;// = new DatabaseContext();
-
         public BackgroundWorker(IScreenShoter screenShoter)
         {          
             _screenShoter = screenShoter;
         }
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public  Task StartAsync(CancellationToken cancellationToken)
         {
-            await _screenShoter.runService(cancellationToken);
+             _screenShoter.runService(cancellationToken);
+            return Task.CompletedTask;
         }
 
 
@@ -39,30 +38,9 @@ namespace ScreenShotGenerator
         public Task StopAsync(CancellationToken cancellationToken)
         {
             System.Diagnostics.Debug.Write("Stop");
-            return _screenShoter.stopService(cancellationToken);
-           // return Task.CompletedTask;
-        }
-
-
-        /*
-        public void Dispose()
-        {
-            timer?.Dispose();
-        }
-        public Task StartAsync(CancellationToken cancellationToken)
-        {
-            timer = new Timer(o => {
-                Interlocked.Increment(ref number);
-                logger.LogInformation($"Printing the worker number {number}");
-            },
-            null,
-            TimeSpan.Zero,
-            TimeSpan.FromSeconds(5));
-
+             _screenShoter.stopService(cancellationToken);
             return Task.CompletedTask;
         }
-        */
-
 
     }
 }

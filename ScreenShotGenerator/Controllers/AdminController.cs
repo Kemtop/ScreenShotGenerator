@@ -80,7 +80,7 @@ namespace ScreenShotGenerator.Controllers
         }
 
 
-       
+
         /// <summary>
         /// Возвращает данные о состоянии памяти.
         /// </summary>
@@ -89,11 +89,11 @@ namespace ScreenShotGenerator.Controllers
         {
             List<mJsonChart> memoryUsages = new List<mJsonChart>();
 
-            foreach(var line in _dbContext.performanceInfo)
+            foreach (var line in _dbContext.performanceInfo)
             {
                 memoryUsages.Add(new mJsonChart { value = line.memoryUsage, date = line.date });
             }
-                                  
+
 
             //Возвращает массив.
             return Json(memoryUsages);
@@ -110,7 +110,7 @@ namespace ScreenShotGenerator.Controllers
             foreach (var line in _dbContext.performanceInfo)
             {
                 cpuLoad.Add(new mJsonChart { value = (int)line.cpuLoad, date = line.date });
-           }
+            }
 
 
             //Возвращает массив.
@@ -123,7 +123,7 @@ namespace ScreenShotGenerator.Controllers
         /// <returns></returns>
         public JsonResult GetPoolWaitTask()
         {
-             List<mJsonChart> poolWait = new List<mJsonChart>();
+            List<mJsonChart> poolWait = new List<mJsonChart>();
 
             foreach (var line in _dbContext.performanceInfo)
             {
@@ -145,9 +145,9 @@ namespace ScreenShotGenerator.Controllers
         {
             if (model == null) return View(model);
 
-            model.InfoMessage = "Сейчас "+DateTime.Now.ToString("hh:mm:ss dd:MM:yyyy");
+            model.InfoMessage = "Сейчас " + DateTime.Now.ToString("hh:mm:ss dd:MM:yyyy");
 
-            if(!ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
                 model.ErrorMessage = "Введены не верные данные. Настройки не сохранены.";
                 return View(model);
@@ -161,18 +161,72 @@ namespace ScreenShotGenerator.Controllers
         }
 
 
-                
-        //[HttpPost]
-        public async Task<IActionResult> rebootBrowser(string button)
+        public  IActionResult rebootBrowser(string button)
         {
+            //Перезапуск сервиса.
+            _screenShoter.restartService();
             return View();
         }
 
-            /// <summary>
-            /// Непосредственно контролер на который происходит редирект, если пользователь не авторизировался.
-            /// </summary>
-            /// <param name="returnUrl"></param>
-            /// <returns></returns>
+
+        /// <summary>
+        /// Отображает список лог файлов.
+        /// </summary>
+        /// <returns></returns>
+        public IActionResult ShowLogs()
+        {
+            //Получение списка имен файлов.
+            string dirPath = @"./Logs";
+            //var directory 
+            IEnumerable<string> listNames = Directory
+            .GetFiles(dirPath, "*", SearchOption.TopDirectoryOnly)
+            .Select(f => Path.GetFileName(f));
+
+
+            List<ShowLogsModel> fileNames = new List<ShowLogsModel>();
+            foreach (string str in listNames)
+            {
+                long length = new System.IO.FileInfo(@"./Logs/"+str).Length;
+
+                string size =(length/1024).ToString()+" Кб";
+
+                fileNames.Add(new ShowLogsModel { name = str,size=size
+                     }
+
+                ); ;
+            }
+
+            //Сортировка по дате.            
+            return View(fileNames.OrderByDescending(x=>x.name));
+        }
+        
+
+        /// <summary>
+        /// Возврат содержимого лог файла в браузер.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        [Route("/showFile/{id}")]
+        public  IActionResult showFile(string id)
+        {
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "Logs",id);
+
+            FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite);
+                                   
+            using (StreamReader reader = new StreamReader(fileStream))
+            {
+                string line= reader.ReadToEnd();
+                return  Content(line);
+            }            
+        }
+
+
+        /// <summary>
+        /// Непосредственно контролер на который происходит редирект, если пользователь не авторизировался.
+        /// </summary>
+        /// <param name="returnUrl"></param>
+        /// <returns></returns>
         [AllowAnonymous]
         public async Task<IActionResult> Login(string returnUrl)
         {

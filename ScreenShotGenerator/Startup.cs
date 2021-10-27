@@ -27,11 +27,13 @@ namespace ScreenShotGenerator
         public Startup(IConfiguration configuration)
         {
             _configuration = configuration;
+            /*
             using (var db = new DatabaseContext())
             {
                 db.Database.EnsureCreated(); //Создаем если нет бд.
                 db.Database.Migrate();
             }
+            */
         }
 
        
@@ -39,16 +41,6 @@ namespace ScreenShotGenerator
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            /*
-            services.AddAuthentication("Cookie")
-          .AddCookie("Cookie", config =>
-          {
-              config.LoginPath = "/Admin/Login"; ;
-              //Путь к странице аллерта.
-              config.AccessDeniedPath = "/Home/AccessDenied";
-          });
-            */
-                      
             //Настройка подключения к  базе данных. Получаю из json файла.
             var conSection = new ConfigurationBuilder().AddJsonFile("appsettings.json").
                 Build().GetSection("PgSqlConnectionStrings");
@@ -121,11 +113,8 @@ namespace ScreenShotGenerator
             services.AddControllersWithViews();
             services.AddHttpContextAccessor(); //Для получения URL хоста.
 
-            services.AddSingleton<IWorker, Worker>();
             services.AddSingleton<IScreenShoter, ScreenShoter>();
             services.AddEntityFrameworkSqlite().AddDbContext<DatabaseContext>();
-            services.AddEntityFrameworkSqlite()
-            .AddDbContext<DatabaseContext>();
 
             /*
                services.AddDbContext<ApplicationDbContext>(config =>

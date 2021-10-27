@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using ScreenShotGenerator.Data;
 using ScreenShotGenerator.Entities;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,34 +17,29 @@ namespace ScreenShotGenerator.perfomenceService
     /// </summary>
     public class perfomanceService : IHostedService
     {
-
         private readonly IServiceScopeFactory scopeFactory;
-
-       
+               
         public perfomanceService(IServiceScopeFactory scopeFactory)
         {
             this.scopeFactory = scopeFactory;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
-        {                     
-                       
-
-
-            var task = Task.Run(() => monitoringPerfomances(cancellationToken));
-
-            return task;
+        {                  
+          Task.Run(() => monitoringPerfomances(cancellationToken));
+            return Task.CompletedTask;
         }
 
       
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            throw new NotImplementedException();
+            return Task.CompletedTask;
         }
-
 
         private async Task monitoringPerfomances(CancellationToken cancellationToken)
         {
+            Log.Information("Run service monitoring perfomaces.");
+
             while (!cancellationToken.IsCancellationRequested)
             {
                 

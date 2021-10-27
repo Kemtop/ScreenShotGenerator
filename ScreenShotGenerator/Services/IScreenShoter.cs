@@ -33,5 +33,10 @@ namespace ScreenShotGenerator.Services
         /// <returns></returns>
         void setSettings(SystemSettingModel m);
 
+        /// <summary>
+        /// Перезапускает службу.
+        /// </summary>
+        void restartService();
+
     }
 }

@@ -38,7 +38,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         ///Остановка браузера.
         /// </summary>
-        void stopBrowser();
+        void stopProcess();
         
     }
 }

@@ -24,7 +24,6 @@ namespace ScreenShotGenerator.Services
     public class ScreenShoter : IScreenShoter
     {
         private readonly IHttpContextAccessor _context; 
-        private readonly ILogger<Worker> logger;
         private readonly DatabaseContext _databaseContext = new DatabaseContext();
 
         private readonly IServiceScopeFactory scopeFactory;
@@ -59,12 +58,11 @@ namespace ScreenShotGenerator.Services
         int browserTasksPerThread=5; //Количество задач из пула которые браузер обрабатывает за раз.
         int clearCashInterval = 10; //Интервал очистки кеша, в часах.
 
-
-        public ScreenShoter(ILogger<Worker> logger,
+         
+        public ScreenShoter(
             IHttpContextAccessor context,
             IServiceScopeFactory scopeFactory)
         {
-            this.logger = logger;
             _context = context;
             this.scopeFactory = scopeFactory;
 
@@ -75,11 +73,7 @@ namespace ScreenShotGenerator.Services
             poolBrowserControls = new List<IBrowserControl>();
 
             //Ведение логов.
-            Log.Logger = new LoggerConfiguration()
-               .MinimumLevel.Debug()
-               .WriteTo.File(@"./Logs/log.txt", rollingInterval: RollingInterval.Day, 
-               outputTemplate:"{Timestamp:HH:mm:ss.fff} [{Level}] {Message}{NewLine}{Exception}")
-               .CreateLogger();
+        
 
 
             //Чтение настроек сервиса.
@@ -112,10 +106,7 @@ namespace ScreenShotGenerator.Services
         public async Task runService(CancellationToken cancellationToken)
         {
             await Task.Delay(2000);
-            Log.Information("Running service...");
-            //createBrowserPool();//Создаем пул браузеров.
-            Log.Information("It running.");
-
+            runTasks(); //Создает пул браузеров.
 
             //Считывает данные кеш из базы данных в память(объект poolCash).
             //readFromDbToCash();
@@ -143,20 +134,55 @@ namespace ScreenShotGenerator.Services
 
         }
 
+        /// <summary>
+        /// Создает пул браузеров.
+        /// </summary>
+        private void runTasks()
+        {
+            Log.Information("Running browser control service...");
+            //createBrowserPool();//Создаем пул браузеров.
+            Log.Information("Browser control service it running.");
 
-        public Task stopService(CancellationToken cancellationToken)
+        }
+
+
+        /// <summary>
+        /// Перезапускает службу.
+        /// </summary>
+        public async void restartService()
+        {
+            stopBrowserPool();
+            //Останавливает все задачи в пуле, закрывает браузеры.
+            int delay = 10000;
+            Log.Information("Waiting " + (delay/1000).ToString() + "s"); ;
+
+            await Task.Delay(delay);
+            runTasks();
+            Log.Information("Service is restarted.");
+        }
+
+
+        /// <summary>
+        /// Останавливает все задачи в пуле, закрывает браузеры.
+        /// </summary>
+        private void stopBrowserPool()
         {
             Log.Information("Stoping services...");
-            //if (Browser != null) Browser.Quit();
+           
             int i = 1;
             foreach (IBrowserControl bc in poolBrowserControls)
             {
-                Log.Information("Close browser..."+i.ToString());
-                bc.stopBrowser();
+                Log.Information("Close browser..." + i.ToString());
+                bc.stopProcess();
                 i++;
             }
 
-            logger.LogInformation("StopService");
+            Log.Information("StopService.");
+        }
+
+        public Task stopService(CancellationToken cancellationToken)
+        {
+            stopBrowserPool();
             return Task.CompletedTask;
         }
 
@@ -283,7 +309,6 @@ namespace ScreenShotGenerator.Services
                 hostName = request.Scheme + "://" + request.Host.Value;
                 poolTask.hostName = hostName; //Передаю значение другим потокам.
                 poolTask.tmpDir = tmpDir;//Директория в которой храняться картинки.
-                logger.LogInformation("get hostname");
             }
            
         }

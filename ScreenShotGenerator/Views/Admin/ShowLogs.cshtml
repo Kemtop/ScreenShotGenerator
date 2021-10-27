@@ -1,0 +1,36 @@
+﻿@using ScreenShotGenerator.Models;
+@model IEnumerable<ShowLogsModel>
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Просмотр логов.</title>
+</head>
+
+<body>
+   
+    <table>
+        @{ foreach (var f in Model)
+            {
+                <tr>
+                            <td>
+                                <a asp-action="showFile" asp-route-id="@f.name">@f.name</a>
+                            </td>
+                    <td>
+                        @f.size
+                    </td>
+                </tr>
+           
+
+            }
+        }
+    </table>
+ 
+
+</body>
+
+</html>

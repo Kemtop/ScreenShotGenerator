@@ -12,22 +12,11 @@
 </head>
 
 <body>
-    <script>
-        import * as img from '/imgCache/';
-        print('ds');
-        for (var i = 0; i < img.length; i++) {
-            document.querySelector("image-container").innerHTML += ('<img src=' + img[i].src);
-        }
-    </script>
-    <div class="image-container">
-    </div>
     @{ foreach (var img in Model)
         {
             <img src='@img.name' width="30%" height="30%">            
         }
     }
 
-
 </body>
-
 </html>

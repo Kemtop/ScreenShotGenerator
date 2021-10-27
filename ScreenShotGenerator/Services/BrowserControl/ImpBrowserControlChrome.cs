@@ -29,7 +29,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         /// Разрешен запуск потока. Флаг используется для остановки потока.
         /// </summary>
-        private bool threadIsRun = true;
+        private bool threadIsRun;
 
         //Синхронизация потоков.
         object locker;
@@ -44,6 +44,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
         //Идентификатор браузера.
         private int browserId=0;
+
+        /// <summary>
+        /// Задача выборки данных из пула и их обработки.
+        /// </summary>
+        private Task workTask;
 
         /// <summary>
         /// Задает идентификатор потока.
@@ -63,21 +68,16 @@ namespace ScreenShotGenerator.Services.BrowserControl
             this.poolTasks = pool;
             tmpDir = pool.tmpDir; 
             this.locker = locker;
-            Thread thread = new Thread(processPoolThread);
-            thread.Start();
+
+            threadIsRun = true; //Задача может работать.
+            //Запускаю задачу.
+            workTask = new Task(processPoolThread);
+            workTask.Start();
 
             /* Почитай про правильную многопоточность.
              * https://stackoverflow.com/questions/8014037/c-sharp-call-a-method-in-a-new-thread
              * Action secondFooAsync = new Action(SecondFoo);
-
-secondFooAsync.BeginInvoke(new AsyncCallback(result =>
-      {
-         (result.AsyncState as Action).EndInvoke(result); 
-
-      }), secondFooAsync); 
              */
-
-            // throw new NotImplementedException();
         }
 
         /// <summary>
@@ -90,12 +90,14 @@ secondFooAsync.BeginInvoke(new AsyncCallback(result =>
 
 
         /// <summary>
-        ///Остановка браузера.
+        ///Отстанавливает браузер,завершает задачу.
         /// </summary>
-        public void stopBrowser()
+        public void stopProcess()
         {
             threadIsRun = false; //Остановка процесса обработки задач, если запущен.
             Browser.Quit();
+            //Ждем завершения потока.
+            Task.WaitAny(workTask);
         }
 
 
@@ -123,6 +125,8 @@ secondFooAsync.BeginInvoke(new AsyncCallback(result =>
 
                 if (data.Count == 0) //Нет данных для обработки.
                 {
+                    //Сервис останавливают. Выходим.
+                    if (!threadIsRun) return;
                     Thread.Sleep(1000);
                     continue;
                 }
@@ -130,11 +134,17 @@ secondFooAsync.BeginInvoke(new AsyncCallback(result =>
 
                 foreach (mJobPool p in data)
                 {
+                    //Сервис останавливают. Выходим.
+                    if (!threadIsRun) return;
+
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
                     //Cоздание скриншота.
                    // Log.Information("take "+p.url+";Browser="+browserId.ToString());
                     string err=takeScreenShot(p.url, p.fileName);
                     //Log.Information("end " + p.url + ";Browser=" + browserId.ToString());
+
+                    //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
+                    if (!threadIsRun) return;
 
                     p.timestamp = DateTime.Now;
 
@@ -172,12 +182,7 @@ secondFooAsync.BeginInvoke(new AsyncCallback(result =>
                     p.status = 3; //Все хорошо.
                     else
                      p.status = 2;
-
-
                 }
-
-
-
             }
         }
 
