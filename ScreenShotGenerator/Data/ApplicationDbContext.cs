@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ScreenShotGenerator.Entities;
+using ScreenShotGenerator.Services.ScreenShoterLogic;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,6 +30,11 @@ namespace ScreenShotGenerator.Data
         /// Настройки сервиса.
         /// </summary>
         public DbSet<mServiceSettings> serviceSettings { get; set; }
+
+        /// <summary>
+        /// Кеш скрин шоттов.
+        /// </summary>
+        public DbSet<mCashTable> screnshotCache { get; set; }
 
     }
 }

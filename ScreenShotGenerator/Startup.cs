@@ -113,7 +113,17 @@ namespace ScreenShotGenerator
             services.AddControllersWithViews();
             services.AddHttpContextAccessor(); //Для получения URL хоста.
 
-            services.AddSingleton<IScreenShoter, ScreenShoter>();
+            //Тест IOC.
+            //Вы можете попробовать CreateInstance<T>
+            services.AddSingleton<IScreenShoter>(x=>
+                    new ScreenShoter(x.GetRequiredService<IHttpContextAccessor>(),
+                    x.GetRequiredService<IServiceScopeFactory>(),
+                    x.GetRequiredService<IConfiguration>(),
+                    a=>{
+                        a.timeGo = 1000;
+                        //_configuration["Authentication:Facebook:AppSecret"];
+
+                    }));
             services.AddEntityFrameworkSqlite().AddDbContext<DatabaseContext>();
 
             /*

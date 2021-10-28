@@ -106,7 +106,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             while (threadIsRun)
             {
                 //Список задач из пула.
-                List<mJobPool> data;
+                List<mJobPool> data=null; 
 
                 //Блокирую пул для других потоков.
                 lock (locker)
@@ -123,7 +123,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 }
 
 
-                if (data.Count == 0) //Нет данных для обработки.
+                //Пул заблокирован или нет данных для обработки.
+                if ((data==null)||(data.Count == 0)) 
                 {
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
@@ -174,14 +175,24 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         }
 
                     }                  
+                 
+                    //Пока пул не будет доступен. Или поток не остановят.
+                    while(threadIsRun)
+                    {
+                        lock(locker)
+                        {
+                            //Были ли ошибки?
+                            if (allGood)
+                                p.status = 3; //Все хорошо.
+                            else
+                                p.status = 2;
+                            break;
+                        }
 
-                                       
+                        Task.Delay(300);
+                    }    
 
-                    //Были ли ошибки?
-                    if (allGood)
-                    p.status = 3; //Все хорошо.
-                    else
-                     p.status = 2;
+                  
                 }
             }
         }

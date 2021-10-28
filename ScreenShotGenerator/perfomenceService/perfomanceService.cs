@@ -1,7 +1,9 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ScreenShotGenerator.Data;
 using ScreenShotGenerator.Entities;
+using ScreenShotGenerator.Services;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -18,10 +20,14 @@ namespace ScreenShotGenerator.perfomenceService
     public class perfomanceService : IHostedService
     {
         private readonly IServiceScopeFactory scopeFactory;
-               
-        public perfomanceService(IServiceScopeFactory scopeFactory)
+        /// <summary>
+        /// Период мониторинга,в секундах.
+        /// </summary>
+        private int intervalMonitoring; 
+        public perfomanceService(IServiceScopeFactory scopeFactory, IConfiguration configuration)
         {
             this.scopeFactory = scopeFactory;
+            intervalMonitoring = Convert.ToInt32(configuration["perfomanceService:intervalMonitoring"]);
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -36,14 +42,18 @@ namespace ScreenShotGenerator.perfomenceService
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Метод работающий в отдельном потоке. Переодически мониторит состояние системы.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         private async Task monitoringPerfomances(CancellationToken cancellationToken)
         {
             Log.Information("Run service monitoring perfomaces.");
 
             while (!cancellationToken.IsCancellationRequested)
-            {
-                
-                await Task.Delay(10000);
+            {                
+                await Task.Delay(intervalMonitoring*1000);
                 double cpuUsage = await GetCpuUsageForProcess();
                 //В байтах.
                 long memoryAlloc = Process.GetCurrentProcess().WorkingSet64 / 1024 / 1024;
@@ -54,10 +64,16 @@ namespace ScreenShotGenerator.perfomenceService
                 line.memoryUsage =(int)memoryAlloc;
                 line.date = DateTime.Now;
 
-                //_dbContext.performanceInfo.Add(line);
+
+                //Получаю количество ожидающих задач.
+                using (var scope = scopeFactory.CreateScope())
+                {
+                    var sc=scope.ServiceProvider.GetRequiredService<IScreenShoter>();
+                    line.poolWaiterTask = sc.getWaitTasksCnt();
+                }
+
 
                 //Добавить сохранение в базу данных каждые...n времени.
-
                 using (var scope = scopeFactory.CreateScope())
                 {
                     ApplicationDbContext _dbContext1 = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -65,12 +81,11 @@ namespace ScreenShotGenerator.perfomenceService
                     _dbContext1.SaveChanges();
                 }
 
-
                 // string _cpuUsage = String.Format("{0:0.00}", cpuUsage);
-
-                Console.WriteLine(cpuUsage);
             }
-            
+
+            Log.Information("Stop service monitoring perfomaces.");
+
         }
 
              

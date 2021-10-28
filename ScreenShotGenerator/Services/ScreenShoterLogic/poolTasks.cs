@@ -59,6 +59,18 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
             return ret.ToList();
         }
 
+   
+        /// <summary>
+        /// Количество ожидающих запросов.
+        /// </summary>
+        /// <returns></returns>
+        public int waitTasksCnt()
+        {
+            IEnumerable<mJobPool> ret = pool.Where(x => x.status == 0);
+            return ret.ToList().Count;
+        }
+
+
 
         /// <summary>
         /// Ищет первый элемент с указанным урл.
@@ -74,6 +86,17 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
                 return null;
         }
 
+        /// <summary>
+        /// Удалить завершенные задачи и задачи с ошибками.
+        /// Возвращает количество удаленных.
+        /// </summary>
+        public int clearComplate()
+        {
+            int cnt = pool.Where(x => (x.status == 3 || x.status == 2)).Count();
+            pool.RemoveAll(x=>(x.status==3||x.status==2));
+
+            return cnt;
+        }
 
     }
 }

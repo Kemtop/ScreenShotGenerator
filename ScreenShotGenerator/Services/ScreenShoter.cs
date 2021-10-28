@@ -18,27 +18,28 @@ using ScreenShotGenerator.Models;
 using ScreenShotGenerator.Data;
 using Microsoft.Extensions.DependencyInjection;
 using ScreenShotGenerator.Entities;
+using Microsoft.Extensions.Configuration;
 
 namespace ScreenShotGenerator.Services
 {
     public class ScreenShoter : IScreenShoter
     {
-        private readonly IHttpContextAccessor _context; 
-        private readonly DatabaseContext _databaseContext = new DatabaseContext();
-
+        private readonly IHttpContextAccessor _context;
         private readonly IServiceScopeFactory scopeFactory;
 
-        //Синхронизация потоков.
+        //Синхронизация потоков, для работы с общим пулом.
         static object locker = new object();
 
-        private int number = 0;
+        //Блокировка кеши poolCache.
+        static object lockCachePool = new object();
+
 
         //Директория для хранения временных файлов.
         const String tmpDir = "imgCache";
 
         //Полное имя хоста.
-        private String hostName=null;
-                
+        private String hostName = null;
+
 
         //Пул задач.
         poolTasks poolTask;
@@ -55,13 +56,43 @@ namespace ScreenShotGenerator.Services
         //int browserTasksPerThread=5; //Количество задач из пула которые браузер обрабатывает за раз.
 
         int poolBrowserSize = 1; //Количество запущенных браузеров.
-        int browserTasksPerThread=5; //Количество задач из пула которые браузер обрабатывает за раз.
+        int browserTasksPerThread = 5; //Количество задач из пула которые браузер обрабатывает за раз.
         int clearCashInterval = 10; //Интервал очистки кеша, в часах.
 
-         
+        /// <summary>
+        /// Включает чтение кеши из базы данных при запуске сервиса.
+        /// Используется для отладки приложения.
+        /// </summary>
+        bool enableReadCacheFromDbInStart = true;
+
+        /// <summary>
+        /// Таймер очистки выполненных задача в пуле задач.
+        /// </summary>
+        Timer timerClearComplatePoolTasks;
+
+        /// <summary>
+        /// Таймер запускающий задачу проверки необходимости очистки кеша.
+        /// </summary>
+        Timer timerClearCache;
+
+        /// <summary>
+        /// Флаг сообщающий о начале процесса очистки пула задач. Запрещает добавление новых, пока не закончиться
+        /// процесс очистки.
+        /// </summary>
+        private bool runClearPoolTasks;
+
+
+        CancellationToken _cancellationToken;
+
+        //Тестовое, удали.
+        public int timeGo;
+
+
         public ScreenShoter(
             IHttpContextAccessor context,
-            IServiceScopeFactory scopeFactory)
+            IServiceScopeFactory scopeFactory,
+            IConfiguration configuration,
+            Action<ScreenShoter> action)
         {
             _context = context;
             this.scopeFactory = scopeFactory;
@@ -72,12 +103,33 @@ namespace ScreenShotGenerator.Services
             poolCache = new poolTasks();
             poolBrowserControls = new List<IBrowserControl>();
 
-            //Ведение логов.
-        
-
-
             //Чтение настроек сервиса.
             readSettingsFromDb();
+
+            //Задаю настройки переодическим действиям. Тест можно удалить.
+            action(this);
+
+
+            if (configuration["ScreenShoter:enableReadCacheFromDbInStart"] == "false")
+            {
+                enableReadCacheFromDbInStart = false;
+            }
+
+            //В минутах.
+            int interval1 = Convert.ToInt32(configuration["ScreenShoter:ClearComplatePoolTasks"]);
+            timerClearComplatePoolTasks = new Timer((Object stateInfo) =>
+            {
+                ClearPoolTasks();
+            }, null, 1000, interval1 * 60000);
+
+
+            //Таймер запускающий задачу проверки необходимости очистки кеша.
+            int interval2 = Convert.ToInt32(configuration["ScreenShoter:intervalCheckNeedClearCash"]);
+            timerClearCache = new Timer((Object stateInfo) =>
+            {
+                clearCache();
+            }, null, 1000, interval2 * 60000);
+
         }
 
         /// <summary>
@@ -88,50 +140,30 @@ namespace ScreenShotGenerator.Services
         {
             SystemSettingModel m = new SystemSettingModel();
             m.browserAmount = poolBrowserSize;  //Количество запущенных браузеров.
-            m.tasksAmount= browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
-            m.clearCashInterval=clearCashInterval; //Интервал очистки кеша, в часах.
+            m.tasksAmount = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
+            m.clearCashInterval = clearCashInterval; //Интервал очистки кеша, в часах.
             m.cacheElementsCnt = poolCache.cacheCnt();
 
             //Количество элементов обрабатываемых на данный момент.
-            m.curentElementsInProcessCnt=poolTask.curentElementsInProcessCnt();
+            m.curentElementsInProcessCnt = poolTask.curentElementsInProcessCnt();
 
             return m;
         }
-              
+
         /// <summary>
         /// Запускает сервис.
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public async Task runService(CancellationToken cancellationToken)
+        public async void runService(CancellationToken cancellationToken)
         {
+            _cancellationToken = cancellationToken;
             await Task.Delay(2000);
             runTasks(); //Создает пул браузеров.
 
             //Считывает данные кеш из базы данных в память(объект poolCash).
-            //readFromDbToCash();
-
-
-            Thread thread3 = new Thread(() =>
-            {
-
-                while (true)
-                {
-                    //logger.LogInformation("Hello_3_");
-                    Task.Delay(5000);
-                }
-
-            });
-            //thread3.Start();
-
-
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                Interlocked.Increment(ref number);
-                //logger.LogInformation($"Worker printing number {number}");
-                await Task.Delay(1000 * 5);
-            }
-
+            if (enableReadCacheFromDbInStart)
+                readFromDbToCash();
         }
 
         /// <summary>
@@ -154,7 +186,7 @@ namespace ScreenShotGenerator.Services
             stopBrowserPool();
             //Останавливает все задачи в пуле, закрывает браузеры.
             int delay = 10000;
-            Log.Information("Waiting " + (delay/1000).ToString() + "s"); ;
+            Log.Information("Waiting " + (delay / 1000).ToString() + "s"); ;
 
             await Task.Delay(delay);
             runTasks();
@@ -168,7 +200,7 @@ namespace ScreenShotGenerator.Services
         private void stopBrowserPool()
         {
             Log.Information("Stoping services...");
-           
+
             int i = 1;
             foreach (IBrowserControl bc in poolBrowserControls)
             {
@@ -200,13 +232,13 @@ namespace ScreenShotGenerator.Services
                 {
                     IBrowserControl Bc = new ImpBrowserControlChrome();
                     Bc.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
-                    Bc.setTaskId(i+1); //Ид браузера, что бы потоки как то можно отличать.
+                    Bc.setTaskId(i + 1); //Ид браузера, что бы потоки как то можно отличать.
                     Bc.startBrowser();//Запустить браузер.
                                       //Пока не понятно нужна ли тут задержка.
                     Bc.processPool(ref poolTask, ref locker); //Запустить обработку пула задач.
                     poolBrowserControls.Add(Bc);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Log.Error("Exception in [createBrowserPool]:" + ex.Message);
                 }
@@ -214,6 +246,22 @@ namespace ScreenShotGenerator.Services
 
         }
 
+
+        /// <summary>
+        /// Добавляет задачу в пул задач.
+        /// </summary>
+        /// <param name="t"></param>
+        private void addTask(mJobPool t)
+        {
+            //Если начат процесс очистки пула, ждем завершения.
+            while (runClearPoolTasks)
+            {
+                Task.Delay(1000);
+                if (_cancellationToken.IsCancellationRequested) return;
+            }
+
+            poolTask.add(t);
+        }
 
 
 
@@ -224,22 +272,22 @@ namespace ScreenShotGenerator.Services
         /// <returns></returns>
         public List<mUserJson> runJob(string[] urls, string userIP)
         {
-            //Получение корневого url, если уже его не получили.
+            //Получение корневого url запроса, если уже его не получили.
             getHostName();
 
-
             //Список для быстрого мониторинга отправленных задач.
+            //Так как содержит ссылки на задачи.
             List<mJobPool> jb = new List<mJobPool>();
 
-             //Прохожу по списку урл.          
+            //Прохожу по списку урл.          
             foreach (string url in urls)
             {
                 mJobPool t; //Задача.
 
-               //Поиск выполненной задачи в кеш сервиса.
-               mJobPool cashValue = poolCache.findUrl(url);
+                //Поиск выполненной задачи в кеш сервиса.
+                mJobPool cashValue = poolCache.findUrl(url);
 
-                if(cashValue==null) //Задача не была выполнена,добавляю в пул.
+                if (cashValue == null) //Задача не была выполнена,добавляю в пул.
                 {
                     t = new mJobPool(); //Новая задача.
                     t.url = url;
@@ -251,46 +299,45 @@ namespace ScreenShotGenerator.Services
                     else
                         elementId++;
 
-                    poolTask.add(t); //Добавляю задачу в пулл задач.
+                    addTask(t);//Добавляю задачу в пулл задач.
+
                 }
                 else //Нашел выполненную.
                 {
-                    t = cashValue;                    
+                    t = cashValue;
                 }
 
-                jb.Add(t);                
+                jb.Add(t);
             }
 
-      
-            //Жду пока браузеры не обработают задачи.
-            bool runing = true;
 
             int taskCnt = jb.Count; //Количество задач.
 
             int cntComplate = 0; //Количество выполненных задач.
-            while(runing)
+
+            //Жду пока браузеры не обработают задачи. Или не остановят процесс.
+            while (!_cancellationToken.IsCancellationRequested)
             {
                 //Считаю количество выполненных задач или задач с ошибками.
                 cntComplate = 0;
-                foreach(mJobPool t in jb)
+                foreach (mJobPool t in jb)
                 {
-                    if ((t.status == 3)|| (t.status == 2)) cntComplate++;
+                    if ((t.status == 3) || (t.status == 2)) cntComplate++;
                 }
 
 
                 //Все задачи выполнены.
-                if(taskCnt==cntComplate)
-                {                   
+                if (taskCnt == cntComplate)
+                {
                     //Добавляет сведения о выполенных задачах в кеш.
                     addToCash(ref jb);
                     logErrors(ref jb, userIP);//Сохраняю сведени об ошибках.
 
                     //Преобразовываю в пользовательский json.
                     return createUserJson(ref jb);
-                   
+
                 }
 
-                Thread.Sleep(500);
             }
 
             return null;
@@ -303,17 +350,17 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private void getHostName()
         {
-            if(hostName==null)
+            if (hostName == null)
             {
                 var request = _context.HttpContext.Request;
                 hostName = request.Scheme + "://" + request.Host.Value;
                 poolTask.hostName = hostName; //Передаю значение другим потокам.
                 poolTask.tmpDir = tmpDir;//Директория в которой храняться картинки.
             }
-           
+
         }
 
-       
+
         /// <summary>
         /// Преобразовываю в пользовательский json.
         /// </summary>
@@ -327,7 +374,7 @@ namespace ScreenShotGenerator.Services
             {
                 mUserJson userLine = new mUserJson();
                 userLine.url = j.url;
-             
+
 
                 //Если не было ошибок.
                 if (j.status == 3)
@@ -338,7 +385,7 @@ namespace ScreenShotGenerator.Services
                 }
 
                 //Возникла ошибка.
-                if(j.status == 2)
+                if (j.status == 2)
                 {
                     userLine.log = j.path;
                     userLine.status = 0;
@@ -351,6 +398,27 @@ namespace ScreenShotGenerator.Services
         }
 
 
+
+        /// <summary>
+        /// Добавляет данные в кеш. Если ресурс занят-ждет.
+        /// </summary>
+        /// <param name="t"></param>
+        private void waitAddToCachPool(mJobPool j)
+        {
+            while (!_cancellationToken.IsCancellationRequested)
+            {
+                lock (lockCachePool)
+                {
+                    poolCache.add(j);
+                    break;
+                }
+
+                //Если ресурс заблокирован, ждем.
+                Task.Delay(1000);
+            }
+
+        }
+
         /// <summary>
         /// Добавляет сведения о выполенных задачах в кеш.
         /// </summary>
@@ -362,10 +430,12 @@ namespace ScreenShotGenerator.Services
             foreach (mJobPool j in jb)
             {
                 //Объект еще не находиться в кеши и обработан успешно.
-                if((j.inCash==false)&&(j.status==3))
+                if ((j.inCash == false) && (j.status == 3))
                 {
+                    //Что бы не было явных пересечений при обработки одинаковых урл.
                     j.inCash = true; //Говорим что объект кеширован.
-                    poolCache.add(j);
+
+                    waitAddToCachPool(j); //Добавляю в кеш, если не заблокирован. Или ждем.                                        
 
                     //Cохраняю в БД на случай перезагрузки сервера.
                     mCashTable line = new mCashTable();
@@ -373,36 +443,54 @@ namespace ScreenShotGenerator.Services
                     line.timestamp = j.timestamp;
                     line.fileName = j.fileName;
 
-                    // var cashTable = _databaseContext.cashTable.Count();
-                    _databaseContext.cashTable.Add(line);
-                    needSaveDb = true;                   
-                }           
+                    //Добавляю строку в БД.
+                    using (var scope = scopeFactory.CreateScope())
+                    {
+                        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                        db.screnshotCache.Add(line);
+                    }
+
+                    needSaveDb = true;
+                }
             }
 
             //Необходимо сохранить значения.
-            if(needSaveDb)
-            _databaseContext.SaveChanges();
+            if (needSaveDb)
+            {
+                using (var scope = scopeFactory.CreateScope())
+                {
+                    ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    db.SaveChanges();
+                }
+
+            }
+
 
         }
-               
+
 
         /// <summary>
         /// Считывает данные кеш из базы данных в память(объект poolCash).
         /// </summary>
         private void readFromDbToCash()
         {
-            //Пулучаю данные из таблицы в виде списка.
-            List<mCashTable> table = _databaseContext.cashTable.ToList();
-
-            foreach(mCashTable ct in table)
+            //Пулучаю данные из таблицы в виде списка.          
+            using (var scope = scopeFactory.CreateScope())
             {
-                mJobPool j = new mJobPool();
-                j.fileName = ct.fileName;
-                j.timestamp = ct.timestamp;
-                j.url = ct.url;
-                j.status = 3; //Задача уже выполнена.
-                j.inCash = true; //Объект в кеши.
-                poolCache.add(j);
+                ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                List<mCashTable> table;
+                table = db.screnshotCache.ToList();
+
+                foreach (mCashTable ct in table)
+                {
+                    mJobPool j = new mJobPool();
+                    j.fileName = ct.fileName;
+                    j.timestamp = ct.timestamp;
+                    j.url = ct.url;
+                    j.status = 3; //Задача уже выполнена.
+                    j.inCash = true; //Объект в кеши.
+                    poolCache.add(j);
+                }
             }
         }
 
@@ -418,7 +506,7 @@ namespace ScreenShotGenerator.Services
                 //Выбираем только ошибки.
                 if (j.status == 2)
                 {
-                    string str = userIP+";"+j.url+";"+j.path;
+                    string str = userIP + ";" + j.url + ";" + j.path;
                     Log.Error(str);
                 }
 
@@ -451,20 +539,20 @@ namespace ScreenShotGenerator.Services
 
                 //Возвращает список имен параметров настройки сервиса.
                 Dictionary<string, string> settings = returnSettingsName();
-                
-                foreach(KeyValuePair<string,string> item in settings)
+
+                foreach (KeyValuePair<string, string> item in settings)
                 {
-                   settings[item.Key]= dbContext.serviceSettings.Where(x=>x.Name==item.Key).
-                        FirstOrDefault().Value;
+                    settings[item.Key] = dbContext.serviceSettings.Where(x => x.Name == item.Key).
+                         FirstOrDefault().Value;
                 }
 
-               poolBrowserSize=Convert.ToInt32(settings["poolBrowserSize"]);  //Количество запущенных браузеров.
-               //Количество задач из пула которые браузер обрабатывает за раз.
-               browserTasksPerThread = Convert.ToInt32(settings["browserTasksPerThread"]);
+                poolBrowserSize = Convert.ToInt32(settings["poolBrowserSize"]);  //Количество запущенных браузеров.
+                                                                                 //Количество задач из пула которые браузер обрабатывает за раз.
+                browserTasksPerThread = Convert.ToInt32(settings["browserTasksPerThread"]);
                 //Интервал очистки кеша, в часах.
-                clearCashInterval = Convert.ToInt32(settings["clearCashInterval"]); 
-            }             
-          
+                clearCashInterval = Convert.ToInt32(settings["clearCashInterval"]);
+            }
+
         }
 
         /// <summary>
@@ -477,14 +565,14 @@ namespace ScreenShotGenerator.Services
             Dictionary<string, string> settings = returnSettingsName();
 
             //Передаю  новые значения.
-            settings["poolBrowserSize"] =m.browserAmount.ToString();  //Количество запущенных браузеров.
+            settings["poolBrowserSize"] = m.browserAmount.ToString();  //Количество запущенных браузеров.
             settings["browserTasksPerThread"] = m.tasksAmount.ToString(); //Количество задач из пула которые браузер обрабатывает за раз.
             settings["clearCashInterval"] = m.clearCashInterval.ToString(); //Интервал очистки кеша, в часах.
-       
+
             using (var scope = scopeFactory.CreateScope())
             {
                 ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-             
+
                 foreach (KeyValuePair<string, string> item in settings)
                 {
                     //Получаю объект с нужным ключем.
@@ -494,9 +582,112 @@ namespace ScreenShotGenerator.Services
                 }
 
                 dbContext.SaveChanges();
-            }            
+            }
         }
 
+        /// <summary>
+        /// Возвращает количество ожидающих задач в пуле задач.
+        /// </summary>
+        /// <returns></returns>
+        public int getWaitTasksCnt()
+        {
+            return poolTask.waitTasksCnt();
+        }
+
+
+        /// <summary>
+        /// Удаляет выполненные задачи из пула.
+        /// </summary>
+        private void ClearPoolTasks()
+        {
+            //Жду пока разблокируют пулЗадач.
+            while (!_cancellationToken.IsCancellationRequested)
+            {
+                //Запрещает другим потокам работать с пулом на время его очистки.
+                lock (locker)
+                {
+                    //Говорю что я начал процесс очистки пула, и добавлять новые задачи в него не нужно.
+                    //Иначе будут ошибки. 
+                    runClearPoolTasks = true;
+
+                    // Удалить завершенные задачи и задачи с ошибками.
+                    // Возвращает количество удаленных.
+                    int cnt = poolTask.clearComplate();
+                    Log.Information("Clear pool Task comlete. Clear=" + cnt.ToString());
+
+                    runClearPoolTasks = false;
+
+                    return;
+                }
+
+                Task.Delay(500);
+            }
+
+        }
+
+
+        /// <summary>
+        /// Очищает кеш в памяти и БД.
+        /// </summary>
+        private void clearCache()
+        {
+            //clearCashInterval в часах.
+            Log.Information("Check cache to need clear.");
+
+            int clearTbCnt = 0;//Количество очищенных объектов в таблице.
+
+            using (var scope = scopeFactory.CreateScope())
+            {
+                ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                //Выбираю те у которых истек интервал хранения в кеши.
+                //clearTbCnt  
+
+                List<mCashTable> tb = dbContext.screnshotCache.Where(x =>
+             x.timestamp.AddDays(clearCashInterval) > DateTime.Now).ToList();
+                clearTbCnt=tb.Count();
+
+                //Удаление файлов на диске.
+                Log.Information("Delete from disk.");
+
+                foreach (mCashTable t in tb)
+                {
+                    try
+                    {
+                        var path = Path.Combine("Dir/" + tmpDir, t.fileName);
+                        File.Delete(path);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Error where delete " + t.fileName + " from disk.");
+                    }
+                }
+
+                Log.Information("Delete from db.");
+                dbContext.screnshotCache.RemoveRange(
+                            dbContext.screnshotCache.Where(x =>
+                            x.timestamp.AddDays(clearCashInterval) > DateTime.Now)
+                    );
+
+                dbContext.SaveChanges();
+                Log.Information("Clear " + clearTbCnt.ToString() + " in db cache tables.");
+
+            }
+
+            //Удаление из памяти.
+            while(!_cancellationToken.IsCancellationRequested)
+            {
+                lock (lockCachePool)
+                {
+                   int cnt=poolCache.clearComplate();
+                   Log.Information("Clear " + cnt.ToString() + " in memory cache tables.");
+
+                    break;
+                }
+
+                Task.Delay(300);
+            }                  
+
+        }
 
     }
 }
