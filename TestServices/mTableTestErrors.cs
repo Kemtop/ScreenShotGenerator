@@ -11,5 +11,6 @@ namespace TestServices
         public int Id { get; set; }
         public string url { get; set; }
         public string error { get; set; }
+        public DateTime create { get; set; }
     }
 }

@@ -1,0 +1,40 @@
+﻿@using ScreenShotGenerator.Entities;
+@model List<mBrowserErrors>
+<h3>Журнал сообщений об ошибках.</h3><br>
+Расшифровка столбца level:<br>
+@{ 
+    foreach(KeyValuePair<int,string> l in ViewBag.nameLevels)
+    {
+        @(l.Value+"="+l.Key) <br>
+    }
+}
+<h4>Выбрано @ViewBag.selectLinesCnt записей</h4>
+    <div>
+        <table border="1">
+            <tr>
+                <td>Id</td>
+                <td>Level</td>
+                <td>Сообщение</td>
+                <td>URL</td>
+                <td>Файл</td>
+                <td>Время</td>
+            </tr>
+            @{
+                foreach (mBrowserErrors l in Model)
+                {
+                        <tr>
+                            <td>@l.Id</td>
+                            <td>@l.level</td>
+                            <td>@l.message</td>
+                            <td> <a href="@l.url">@l.url</a></td>
+                            <td> 
+                                <a href="/imgCache/@l.filename">
+                                <img src='/imgCache/@l.filename' width="50%" height="50%">  
+                                </a>
+                             </td> 
+                            <td>@l.created</td>
+                        </tr>
+                }
+            }
+        </table>
+    </div>

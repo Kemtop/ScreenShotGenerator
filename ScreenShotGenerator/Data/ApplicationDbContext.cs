@@ -17,6 +17,8 @@ namespace ScreenShotGenerator.Data
         public  ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             :base(options)
         {
+
+            //Возникает исключение при играх с сетью.
                 Database.EnsureCreated();
                 Database.Migrate();
         }
@@ -35,6 +37,11 @@ namespace ScreenShotGenerator.Data
         /// Кеш скрин шоттов.
         /// </summary>
         public DbSet<mCashTable> screnshotCache { get; set; }
+
+        /// <summary>
+        /// Ошибки браузера.
+        /// </summary>
+        public DbSet<mBrowserErrors> browserErrors { get; set; }
 
     }
 }

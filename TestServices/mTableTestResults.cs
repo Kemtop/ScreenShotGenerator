@@ -18,5 +18,7 @@ namespace TestServices
         /// Время выполнения общего запроса.
         /// </summary>
         public double elapsedTime { get; set; }
+
+        public DateTime create { get; set; }
     }
 }

@@ -1,4 +1,5 @@
 ﻿
+using ImageMagick;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using ScreenShotGenerator.Services.ScreenShoterLogic;
@@ -51,6 +52,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private Task workTask;
 
         /// <summary>
+        /// Делегат для сохранения сведений об ошибках браузера.
+        /// </summary>
+        private saveBrowserError saveBrowserErrorDg;
+
+
+        /// <summary>
         /// Задает идентификатор потока.
         /// </summary>
         /// <param name="id"></param>
@@ -63,11 +70,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Обработка задач в потоке задач. Выполняется запускает отдельный процесс для проверки и обработки задачи.
         /// </summary>
         /// <param name="poolTasks"></param>
-        public void processPool(ref poolTasks pool, ref object locker)
+        public void processPool(ref poolTasks pool, ref object locker, saveBrowserError saveBrowserErrorDg_)
         {
             this.poolTasks = pool;
             tmpDir = pool.tmpDir; 
             this.locker = locker;
+            saveBrowserErrorDg = saveBrowserErrorDg_;
 
             threadIsRun = true; //Задача может работать.
             //Запускаю задачу.
@@ -138,6 +146,18 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
 
+                    //Проверка урл на пустоту.
+                    if(String.IsNullOrEmpty(p.url))
+                    {
+                        p.path = "Error:Empty url!";
+                        p.status = 2;
+                        //Сохраняю логи в БД.
+                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, p.path, p.url, p.fileName);
+                        continue;
+                    }
+
+
+
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
                     //Cоздание скриншота.
                    // Log.Information("take "+p.url+";Browser="+browserId.ToString());
@@ -159,8 +179,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     }
                     else
                     {
+                        //Полный путь.
+                        string path = Path.Combine("wwwroot/" + tmpDir, p.fileName);
+
                         //Почему то файл не создался. 
-                        if (!checkExistFile(p.fileName))
+                        if (!checkExistFile(path))
                         {
                             p.path = "File no exist.";
                             allGood = false;
@@ -168,12 +191,20 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
 
                         //Почему то файл пуст. 
-                        if (!checkFileSize(p.fileName))
+                        if (!checkFileSize(path))
                         {
                             p.path = "File length is 0.";
                             allGood = false;
                         }
 
+                        //Проверяет не вернул ли браузер черную или белую картинку.
+                        int chkColorErr = imgOnlyBlackOrWhite(path);
+                        if(chkColorErr!=0)
+                        {
+                            p.path = "Image contains only "+((chkColorErr==1)?"white":"black")+" pixels.";
+                            allGood = false;                           
+                        }
+                        
                     }                  
                  
                     //Пока пул не будет доступен. Или поток не остановят.
@@ -185,7 +216,13 @@ namespace ScreenShotGenerator.Services.BrowserControl
                             if (allGood)
                                 p.status = 3; //Все хорошо.
                             else
+                            {
                                 p.status = 2;
+                                //Сохраняю логи в БД.
+                                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, p.path, p.url, p.fileName);
+                            }
+                                
+
                             break;
                         }
 
@@ -203,9 +240,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         /// <param name="fileName"></param>
         /// <returns></returns>
-        private bool checkExistFile(string fileName)
+        private bool checkExistFile(string path)
         {            
-            var path = Path.Combine("wwwroot/"+tmpDir, fileName);
             bool exists = System.IO.File.Exists(path);
             return exists;
         }
@@ -215,9 +251,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         /// <param name="fileName"></param>
         /// <returns></returns>
-        private bool checkFileSize(string fileName)
+        private bool checkFileSize(string path)
         {
-            var path = Path.Combine("wwwroot/" + tmpDir, fileName);
+
             long length = new System.IO.FileInfo(path).Length;
 
             if (length == 0) return false;
@@ -226,9 +262,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
        
-
-
-
         /// <summary>
         /// На основании входной строки формирует ее хеш
         /// </summary>
@@ -358,19 +391,53 @@ driver.get("https://google.com");
         /// <returns></returns>
         private string takeScreenShot(string url, string filename)
         {
+           
+                //Выполняю проверку живой ли браузер.
+                try
+                {
+                     //Если с объектом что то не то-думаю должно высыпаться. Но как проверить пока не ясно.
+                    string ttl = Browser.Title;
+
+                    if(ttl==null)
+                    {
+                        saveBrowserErrorDg((int)enumBrowserError.Debug, "Warning! Browser title is null. May be crash?",url,filename);
+                    }
+
+                }
+                catch(Exception ex)
+                {
+                    string str = "Exception to check title. Browser may be dead.: " + ex.Message;
+                    saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename); 
+                    return "Error 701";
+                }
+                
+
             try
             {
-
                 //Browser.Manage().Window.Size = new Size(1280, 1060);
                 //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
                 Browser.Navigate().GoToUrl(url);
-                string bodyText =Browser.FindElement(By.TagName("body")).Text;
+            }
+            catch(Exception ex)
+            {
+                string str = "Exception to GoToUrl: " + ex.Message;
+                saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
+                //Обработали исключение, сделали скрин шот, отправили пользователю.
+            }
 
-                //Обработка ошибки 404.
-                if(bodyText.Contains("404"))
-                {
-                    return "Error 404 in body:" + bodyText;
-                }
+              
+
+
+            try
+            {
+                /*
+            string bodyText =Browser.FindElement(By.TagName("body")).Text;
+            //Обработка ошибки 404.
+            if(bodyText.Contains("404"))
+            {
+                return "Error 404 in body:" + bodyText;
+            }
+            */
 
 
                 /*
@@ -422,18 +489,132 @@ driver.get("https://google.com");
                     //        new JpegEncoder() { Quality = 85 });
 
 
-
-
                 }
             }catch(Exception ex)
             {
-                return "Exception in metod takeScreenShot:" + ex.Message;
+                String str= "Exception in metod takeScreenShot where create and save screenshot: " + ex.Message;
+                saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename);
+                return "Error 702";
             }
 
             return null;
 
         }
 
+        /*
+         * Для тестов.
+         *  String str1 = Path.Combine(Directory.GetCurrentDirectory(), "FullWhite.png");
+            String str2 = Path.Combine(Directory.GetCurrentDirectory(), "FullBlack.png");
+            String str3 = Path.Combine(Directory.GetCurrentDirectory(), "helloMan.jpg");
+
+            int y1 = imgOnlyBlackOrWhite(str1);
+            int y2 = imgOnlyBlackOrWhite(str2);
+            int y3 = imgOnlyBlackOrWhite(str3);
+            y1 = 10;
+         */
+
+        /// <summary>
+        /// Проверет содержит ли картинка только черные или белые пиксели.
+        /// Т.е. рисунок полностью белый или полностью черный.
+        /// Если только белые=1, если только черные=2, нет однотонных =0
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        private int imgOnlyBlackOrWhite(string path)
+        {
+            //Думаю что вся картинка содержит черные пиксели.
+            bool onlyWhite = true;
+            bool onlyBlack = true;
+
+            using (var image = new MagickImage(path))
+            {
+                MagickColor white = MagickColors.White;
+                MagickColor black = MagickColors.Black;
+
+                using (IPixelCollection<ushort> pixels = image.GetPixels())
+                {
+                    //Проверка наличия только белых пикселей.
+                    foreach (var pixel in pixels)
+                    {
+                        IMagickColor<ushort> color = pixel.ToColor();
+                        if (!((color.R == white.R) && (color.G == white.G) && (color.B == white.B) &&
+                            (color.A == white.A) && (color.K == white.K)))
+                        {
+                            onlyWhite = false;
+                            break;
+                        }
+
+                    }
+
+                    if (onlyWhite) return 1; //Только белый.
+
+                    //Проверка наличия только черных пикселей.
+                    foreach (var pixel in pixels)
+                    {
+                        IMagickColor<ushort> color = pixel.ToColor();
+                        if (!((color.R == black.R) && (color.G == black.G) && (color.B == black.B) &&
+                           (color.A == black.A) && (color.K == black.K)))
+                        {
+                            onlyBlack = false;
+                            break;
+                        }
+
+                    }
+
+                    if (onlyBlack) return 2; //Только черный.
+
+                }
+
+            }
+
+            return 0;
+        }
+
+
+        /*
+        /// <summary>
+        /// Создает стандартную исконку с надписью.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="fileName"></param>
+        private void createErrorImage(string url,string fileName)
+        {
+        using ImageMagick;
+         var pathToBackgroundImage = "helloMan.jpg";
+            var pathToNewImage = "helloMan1.jpg";
+            var textToWrite = "Text";
+
+            // These settings will create a new caption
+            // which automatically resizes the text to best
+            // fit within the box.
+
+            var readSettings = new MagickReadSettings
+            {
+                Font = "Calibri",
+                FontPointsize=50,
+                TextGravity = Gravity.Center,
+                BackgroundColor = MagickColors.Transparent,
+                FillColor = MagickColors.Red, // -fill black
+                StrokeColor = MagickColors.Red,                
+                Height = 50, // height of text box
+                Width = 400 // width of text box
+            };
+
+            //Размер картинки 600х597
+
+            using (var image = new MagickImage(pathToBackgroundImage))
+            {
+                using (var caption = new MagickImage($"caption:{textToWrite}", readSettings))
+                {
+                    // Add the caption layer on top of the background image
+                    // at position 590,450
+                    image.Composite(caption, 20, 400, CompositeOperator.Over);
+
+                    image.Write(pathToNewImage);
+                }
+            }
+        }
+        */
 
     }
 }

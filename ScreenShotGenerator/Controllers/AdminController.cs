@@ -14,6 +14,7 @@ using ScreenShotGenerator.Data;
 using ScreenShotGenerator.Entities;
 using ScreenShotGenerator.Models;
 using ScreenShotGenerator.Services;
+using ScreenShotGenerator.Services.BrowserControl;
 
 namespace ScreenShotGenerator.Controllers
 {
@@ -161,7 +162,7 @@ namespace ScreenShotGenerator.Controllers
         }
 
 
-        public  IActionResult rebootBrowser(string button)
+        public IActionResult rebootBrowser(string button)
         {
             //Перезапуск сервиса.
             _screenShoter.restartService();
@@ -186,20 +187,23 @@ namespace ScreenShotGenerator.Controllers
             List<ShowLogsModel> fileNames = new List<ShowLogsModel>();
             foreach (string str in listNames)
             {
-                long length = new System.IO.FileInfo(@"./Logs/"+str).Length;
+                long length = new System.IO.FileInfo(@"./Logs/" + str).Length;
 
-                string size =(length/1024).ToString()+" Кб";
+                string size = (length / 1024).ToString() + " Кб";
 
-                fileNames.Add(new ShowLogsModel { name = str,size=size
-                     }
+                fileNames.Add(new ShowLogsModel
+                {
+                    name = str,
+                    size = size
+                }
 
                 ); ;
             }
 
             //Сортировка по дате.            
-            return View(fileNames.OrderByDescending(x=>x.name));
+            return View(fileNames.OrderByDescending(x => x.name));
         }
-        
+
 
         /// <summary>
         /// Возврат содержимого лог файла в браузер.
@@ -207,19 +211,43 @@ namespace ScreenShotGenerator.Controllers
         /// <param name="id"></param>
         /// <returns></returns>
         [Route("/showFile/{id}")]
-        public  IActionResult showFile(string id)
+        public IActionResult showFile(string id)
         {
-            var path = Path.Combine(Directory.GetCurrentDirectory(), "Logs",id);
+            var path = Path.Combine(Directory.GetCurrentDirectory(), "Logs", id);
 
             FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read,
                 FileShare.ReadWrite);
-                                   
+
             using (StreamReader reader = new StreamReader(fileStream))
             {
-                string line= reader.ReadToEnd();
-                return  Content(line);
-            }            
+                string line = reader.ReadToEnd();
+                return Content(line);
+            }
         }
+
+        /// <summary>
+        /// Просмотр данных таблицы ошибок браузера.
+        /// </summary>
+        /// <returns></returns>
+        public IActionResult ShowBrowserErrors()
+        {
+
+            //Данные из таблицы. Первым в списке будут последние записи. В количестве что бы браузер не умер.
+            int selectLinesCnt = 100; //Количество выбранных записей.
+            List<mBrowserErrors> data = _dbContext.browserErrors.OrderByDescending(x=>x.Id).Take(selectLinesCnt).ToList();
+
+            //Названия ошибок.
+            var nameLevels = new Dictionary<int, string>();
+            foreach (var name in Enum.GetNames(typeof(enumBrowserError)))
+            {
+                nameLevels.Add((int)Enum.Parse(typeof(enumBrowserError), name), name);
+            }
+
+            ViewBag.selectLinesCnt = selectLinesCnt;
+            ViewBag.nameLevels = nameLevels;
+            return View(data);
+        }
+
 
 
         /// <summary>
@@ -254,10 +282,10 @@ namespace ScreenShotGenerator.Controllers
         {
             //Список внешних провайдеров.
             var externalProvider = await _signInManager.GetExternalAuthenticationSchemesAsync();
-                       
+
             //В некоторых случаях если пользователь очень быстро нажимает на кнопку "Войти"
             //в контроллер приходит пустая модель. Решено сделать так. Иначе исключение.
-            if(model==null)
+            if (model == null)
             {
                 return Ok();
             }
@@ -268,7 +296,7 @@ namespace ScreenShotGenerator.Controllers
             //Если не чего не ввел.
             if (!ModelState.IsValid)
             {
-                 return View(model);
+                return View(model);
             }
 
 
@@ -277,7 +305,7 @@ namespace ScreenShotGenerator.Controllers
             //Пользователь не найден.
             if (user == null)
             {
-                ModelState.AddModelError("", "User not found/Пользователь не найден.");                
+                ModelState.AddModelError("", "User not found/Пользователь не найден.");
                 return View(model);
             }
 
@@ -303,9 +331,9 @@ namespace ScreenShotGenerator.Controllers
         public IActionResult ExternalLogin(string provider, string returnUrl)
         {
             //Url на который вернет нас внешний провайдер после проверки пользователя.
-            var redirectUrl = Url.Action(nameof(ExternalLoginCallback),"Admin",new { returnUrl});
-            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider,redirectUrl);
-            return Challenge(properties,provider);
+            var redirectUrl = Url.Action(nameof(ExternalLoginCallback), "Admin", new { returnUrl });
+            var properties = _signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+            return Challenge(properties, provider);
 
         }
 
@@ -323,7 +351,7 @@ namespace ScreenShotGenerator.Controllers
 
 
             //По чему то авторизация не произошла.
-            if(info==null)
+            if (info == null)
             {
                 return RedirectToAction("Login");
             }
@@ -331,21 +359,21 @@ namespace ScreenShotGenerator.Controllers
             //Все хорошо, и пользователь авторизировался.
 
             //Авторизуем пользователя при помощи провайдера в нашей системе.
-           var result=
-                await _signInManager.ExternalLoginSignInAsync(info.LoginProvider,info.ProviderKey,false,false);
+            var result =
+                 await _signInManager.ExternalLoginSignInAsync(info.LoginProvider, info.ProviderKey, false, false);
 
             //Пользователь существует в нашей системе.
-            if(result.Succeeded)
+            if (result.Succeeded)
             {
                 //Переход на страницу пользователя.
-                return RedirectToAction("","UserPage");
+                return RedirectToAction("", "UserPage");
             }
 
             return RedirectToAction("RegisterExternal", new ExternalLoginViewModel
             {
                 ReturnUrl = returnUrl,
                 Username = info.Principal.FindFirstValue(ClaimTypes.Name)
-            }); ; 
+            }); ;
         }
 
 
@@ -369,12 +397,12 @@ namespace ScreenShotGenerator.Controllers
 
         [HttpPost]
         [AllowAnonymous]
-        [ActionName("RegisterExternal")] 
+        [ActionName("RegisterExternal")]
         public async Task<IActionResult> RegisterExternalConfirmed(ExternalLoginViewModel model)
         {
             //Пользователь действительно авторизировался через внешний провайдер.
-            var info =await _signInManager.GetExternalLoginInfoAsync();
-            if(info==null)
+            var info = await _signInManager.GetExternalLoginInfoAsync();
+            if (info == null)
             {
                 return RedirectToAction("Login");
             }
@@ -383,18 +411,18 @@ namespace ScreenShotGenerator.Controllers
             var user = new ApplicationUser(model.Username);
             var result = await _userManager.CreateAsync(user);
             //Успешно добавлен в БД.
-            if(result.Succeeded)
+            if (result.Succeeded)
             {
-                var calimsResult= 
-                    await _userManager.AddClaimAsync(user,new Claim(ClaimTypes.Role,RolesConst.User));
+                var calimsResult =
+                    await _userManager.AddClaimAsync(user, new Claim(ClaimTypes.Role, RolesConst.User));
 
-                if(calimsResult.Succeeded)
+                if (calimsResult.Succeeded)
                 {
-                    var identityResult = await _userManager.AddLoginAsync(user,info);
-                    if(identityResult.Succeeded)
+                    var identityResult = await _userManager.AddLoginAsync(user, info);
+                    if (identityResult.Succeeded)
                     {
                         //Авторизируем пользователя в нашем приложении.
-                        await _signInManager.SignInAsync(user,false);
+                        await _signInManager.SignInAsync(user, false);
                         return RedirectToAction("", "UserPage");
                     }
                 }
@@ -413,11 +441,11 @@ namespace ScreenShotGenerator.Controllers
         }
 
 
-       
 
 
 
-        
+
+
 
         /// <summary>
         /// Выход.
@@ -425,13 +453,13 @@ namespace ScreenShotGenerator.Controllers
         /// <returns></returns>
         public async Task<IActionResult> LogoutAsync()
         {
-            await _signInManager.SignOutAsync(); 
+            await _signInManager.SignOutAsync();
             return Redirect("/Home/Index"); ;
         }
 
 
-       
 
-     
+
+
     }
 }

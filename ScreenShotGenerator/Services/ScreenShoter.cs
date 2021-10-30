@@ -22,6 +22,13 @@ using Microsoft.Extensions.Configuration;
 
 namespace ScreenShotGenerator.Services
 {
+    /// <summary>
+    /// Делегат для сохранения ошибок браузера.
+    /// </summary>
+    /// <param name="level"></param>
+    /// <param name="message"></param>
+     public delegate void saveBrowserError(int level,string message,string url,string filename);
+
     public class ScreenShoter : IScreenShoter
     {
         private readonly IHttpContextAccessor _context;
@@ -87,6 +94,11 @@ namespace ScreenShotGenerator.Services
         //Тестовое, удали.
         public int timeGo;
 
+        /// <summary>
+        /// Делегат для записи ошибок браузера в БД.
+        /// </summary>
+        saveBrowserError saveBrowserErrorDg;
+
 
         public ScreenShoter(
             IHttpContextAccessor context,
@@ -117,18 +129,22 @@ namespace ScreenShotGenerator.Services
 
             //В минутах.
             int interval1 = Convert.ToInt32(configuration["ScreenShoter:ClearComplatePoolTasks"]);
+            interval1*= 60000; //Переводим в минуты.
             timerClearComplatePoolTasks = new Timer((Object stateInfo) =>
             {
                 ClearPoolTasks();
-            }, null, 1000, interval1 * 60000);
+            }, null, interval1, interval1);
 
 
             //Таймер запускающий задачу проверки необходимости очистки кеша.
             int interval2 = Convert.ToInt32(configuration["ScreenShoter:intervalCheckNeedClearCash"]);
             timerClearCache = new Timer((Object stateInfo) =>
             {
-                clearCache();
+               // clearCache();
             }, null, 1000, interval2 * 60000);
+
+            //Делегат для записи ошибок.
+            saveBrowserErrorDg = saveBrowserError;
 
         }
 
@@ -172,7 +188,7 @@ namespace ScreenShotGenerator.Services
         private void runTasks()
         {
             Log.Information("Running browser control service...");
-            //createBrowserPool();//Создаем пул браузеров.
+            createBrowserPool();//Создаем пул браузеров.
             Log.Information("Browser control service it running.");
 
         }
@@ -235,7 +251,7 @@ namespace ScreenShotGenerator.Services
                     Bc.setTaskId(i + 1); //Ид браузера, что бы потоки как то можно отличать.
                     Bc.startBrowser();//Запустить браузер.
                                       //Пока не понятно нужна ли тут задержка.
-                    Bc.processPool(ref poolTask, ref locker); //Запустить обработку пула задач.
+                    Bc.processPool(ref poolTask, ref locker, saveBrowserErrorDg); //Запустить обработку пула задач.
                     poolBrowserControls.Add(Bc);
                 }
                 catch (Exception ex)
@@ -427,45 +443,39 @@ namespace ScreenShotGenerator.Services
 
             bool needSaveDb = false; //Необходимо обновить данные в таблице.
 
-            foreach (mJobPool j in jb)
+            //Добавляю строку в БД.
+            using (var scope = scopeFactory.CreateScope())
             {
-                //Объект еще не находиться в кеши и обработан успешно.
-                if ((j.inCash == false) && (j.status == 3))
+                ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+              
+                foreach (mJobPool j in jb)
                 {
-                    //Что бы не было явных пересечений при обработки одинаковых урл.
-                    j.inCash = true; //Говорим что объект кеширован.
-
-                    waitAddToCachPool(j); //Добавляю в кеш, если не заблокирован. Или ждем.                                        
-
-                    //Cохраняю в БД на случай перезагрузки сервера.
-                    mCashTable line = new mCashTable();
-                    line.url = j.url;
-                    line.timestamp = j.timestamp;
-                    line.fileName = j.fileName;
-
-                    //Добавляю строку в БД.
-                    using (var scope = scopeFactory.CreateScope())
+                    //Объект еще не находиться в кеши и обработан успешно.
+                    if ((j.inCash == false) && (j.status == 3))
                     {
-                        ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                        //Что бы не было явных пересечений при обработки одинаковых урл.
+                        j.inCash = true; //Говорим что объект кеширован.
+
+                        waitAddToCachPool(j); //Добавляю в кеш, если не заблокирован. Или ждем.                                        
+
+                        //Cохраняю в БД на случай перезагрузки сервера.
+                        mCashTable line = new mCashTable();
+                        line.url = j.url;
+                        line.timestamp = j.timestamp;
+                        line.fileName = j.fileName;
+
                         db.screnshotCache.Add(line);
+                        needSaveDb = true;
                     }
-
-                    needSaveDb = true;
                 }
-            }
 
-            //Необходимо сохранить значения.
-            if (needSaveDb)
-            {
-                using (var scope = scopeFactory.CreateScope())
+                //Необходимо сохранить значения.
+                if (needSaveDb)
                 {
-                    ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                    db.SaveChanges();
+                  db.SaveChanges();                  
                 }
-
             }
-
-
+            
         }
 
 
@@ -634,31 +644,30 @@ namespace ScreenShotGenerator.Services
             //clearCashInterval в часах.
             Log.Information("Check cache to need clear.");
 
-            int clearTbCnt = 0;//Количество очищенных объектов в таблице.
-
             using (var scope = scopeFactory.CreateScope())
             {
                 ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 //Выбираю те у которых истек интервал хранения в кеши.
                 //clearTbCnt  
 
+                int clearTbCnt = 0;//Количество очищенных объектов в таблице. 
                 List<mCashTable> tb = dbContext.screnshotCache.Where(x =>
              x.timestamp.AddDays(clearCashInterval) > DateTime.Now).ToList();
                 clearTbCnt=tb.Count();
 
                 //Удаление файлов на диске.
-                Log.Information("Delete from disk.");
+                Log.Information("Delete from disk."+clearTbCnt.ToString()+" items.");
 
                 foreach (mCashTable t in tb)
                 {
                     try
                     {
-                        var path = Path.Combine("Dir/" + tmpDir, t.fileName);
+                        var path = Path.Combine(@"wwwroot/imgCache/", t.fileName);
                         File.Delete(path);
                     }
                     catch (Exception ex)
                     {
-                        Log.Error("Error where delete " + t.fileName + " from disk.");
+                        Log.Error("Error where delete " + t.fileName + " from disk. Exception:" + ex.Message);
                     }
                 }
 
@@ -687,6 +696,32 @@ namespace ScreenShotGenerator.Services
                 Task.Delay(300);
             }                  
 
+        }
+
+        /// <summary>
+        /// В таблицу browserError добавляю сообщение об ошибках браузера.
+        /// level=1 -ошибки при попытке открыть url.
+        /// level=2 ошибки похожие на краш браузера.
+        /// level=3 ошибки при создании скрин шотта.
+        /// 
+        /// </summary>
+        /// <param name="level"></param>
+        /// <param name="messages"></param>
+        private void saveBrowserError(int level,string messages, string url, string filename)
+        {
+            using (var scope=scopeFactory.CreateScope() )
+            {
+                ApplicationDbContext db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                mBrowserErrors m = new mBrowserErrors();
+                m.level = level;
+                m.message = messages;
+                m.url = url;
+                m.filename = filename;
+                m.created = DateTime.Now;
+
+                db.browserErrors.Add(m);
+                db.SaveChanges();
+            }
         }
 
     }

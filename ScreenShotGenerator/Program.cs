@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using ImageMagick;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,6 +12,10 @@ using Microsoft.Extensions.Logging;
 using ScreenShotGenerator.perfomenceService;
 using Serilog;
 using Serilog.Events;
+
+
+
+
 
 namespace ScreenShotGenerator
 {
@@ -70,8 +76,10 @@ namespace ScreenShotGenerator
          .ConfigureServices(s => s.AddHostedService<perfomanceService>())
         //Сервис скринов.
         .ConfigureServices(services => services.AddHostedService<BackgroundWorker>());
-            
+
+ 
     }
 
 
+    
 }

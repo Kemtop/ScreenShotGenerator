@@ -28,7 +28,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Управляющий процесс запускает в отдельном потоке.
         /// </summary>
         /// <param name="poolTasks"></param>
-        void processPool(ref poolTasks pool,ref object locker);
+        void processPool(ref poolTasks pool,ref object locker,saveBrowserError saveBrowserErrorDg);
 
         /// <summary>
         /// Запуск браузера.

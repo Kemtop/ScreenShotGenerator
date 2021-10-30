@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using System.Web;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -35,13 +36,18 @@ namespace ScreenShotGenerator.Controllers
         /// </summary>
         /// <returns></returns>
         [AllowAnonymous]
-        public IActionResult Index(string []url,string allowedReferer)
-        {            
-
+        public IActionResult Index(string []url, string allowedReferer)
+        {
+            //string url1
             // System.Diagnostics.Debug.WriteLine("fdssssssssssss");
             // System.Diagnostics.Debug.WriteLine("p="+url[0]);
             //?url[0]=https://google.ru&url[1]=https://google.com&url[2]=https://yandex.com&allowedReferer=1
 
+
+            //bool useEnc = false;
+           //if (useEncoding != null) useEnc = true;
+
+          
             //Запрещено пользоваться посторонним лицам.
             if (allowedReferer==null)
             {              
@@ -50,10 +56,11 @@ namespace ScreenShotGenerator.Controllers
             }
             else
             {
+              
                 //Получаю ip пользователя.
                 IPAddress userIp = HttpContextAccessor.HttpContext.Connection.RemoteIpAddress;
                 string strIP = userIp.ToString();
-
+                //url нормально понимают преобразованные символы в запросе типа %23 и т.д.
                 List<mUserJson> ret =_screenShoter.runJob(url,strIP);
                 return Json(ret);
             }
@@ -61,7 +68,41 @@ namespace ScreenShotGenerator.Controllers
           
         }
 
-       
+        //Для 
+        // string parameters1 = HttpContextAccessor.HttpContext.Request.Scheme;// QueryString.ToString();
+        //
+        //Удалить если нельзя.
+        private List<string> parceGetParametrs(string inStr,bool useEncoding)
+        {
+            List<string> urls = new List<string>();
+
+            string[] url =inStr.Split("url[");
+
+            foreach(string u in url)
+            {
+                if(u.Contains("]="))
+                {
+                    int pos = u.IndexOf("]=");
+                    if (pos == -1) continue;
+                    //Вырезаю строку после "]=" и до последнего символа(который будет&).
+                    string str1 = u.Substring(pos+2,u.Length-(pos+3));
+
+                    if(useEncoding)
+                    {
+                        str1 = HttpUtility.UrlDecode(str1);
+                    }
+
+                    urls.Add(str1);
+                }
+            }
+
+            //Исправляю проблеммы
+
+
+            return urls;
+
+        }
+
 
         public IActionResult Privacy()
         {
