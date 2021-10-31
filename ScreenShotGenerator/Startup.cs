@@ -27,13 +27,6 @@ namespace ScreenShotGenerator
         public Startup(IConfiguration configuration)
         {
             _configuration = configuration;
-            /*
-            using (var db = new DatabaseContext())
-            {
-                db.Database.EnsureCreated(); //Создаем если нет бд.
-                db.Database.Migrate();
-            }
-            */
         }
 
        
@@ -124,7 +117,7 @@ namespace ScreenShotGenerator
                         //_configuration["Authentication:Facebook:AppSecret"];
 
                     }));
-            services.AddEntityFrameworkSqlite().AddDbContext<DatabaseContext>();
+            
 
             /*
                services.AddDbContext<ApplicationDbContext>(config =>
