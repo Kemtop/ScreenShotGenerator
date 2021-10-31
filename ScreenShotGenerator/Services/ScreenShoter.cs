@@ -88,16 +88,25 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private bool runClearPoolTasks;
 
-
+        /// <summary>
+        /// Токен завершения потока.
+        /// </summary>
         CancellationToken _cancellationToken;
-
-        //Тестовое, удали.
-        public int timeGo;
 
         /// <summary>
         /// Делегат для записи ошибок браузера в БД.
         /// </summary>
         saveBrowserError saveBrowserErrorDg;
+
+
+        /// <summary>
+        /// Тайм аут загрузки страницы браузером.
+        /// </summary>
+        int pageLoadTimeouts;
+        /// <summary>
+        /// Тайм аут загрузки скриптов браузером.
+        /// </summary>
+        int javaScriptTimeouts;
 
 
         public ScreenShoter(
@@ -132,60 +141,11 @@ namespace ScreenShotGenerator.Services
             //Делегат для записи ошибок.
             saveBrowserErrorDg = saveBrowserError;
 
+            //Читаю таймауты из конфига.
+            pageLoadTimeouts = parceIntCfgValue(configuration, "PageLoadTimeouts", 8);
+            javaScriptTimeouts = parceIntCfgValue(configuration, "JavaScriptTimeouts", 8);
+
         }
-
-
-        /// <summary>
-        /// Настраивает таймеры.
-        /// </summary>
-        private void createTimers(IConfiguration configuration)
-        {
-            //Очистка завершенных задач.В минутах.
-            int interval1 = 0;
-            //Проверки корректности данных. Если пользователь введет ерунду.
-            if(!Int32.TryParse(configuration["ScreenShoter:ClearComplatePoolTasks"],out interval1))
-            {
-                Log.Error("Can't convert parameter ScreenShoter:ClearComplatePoolTasks to Int32. Bad value:"+
-                   configuration["ScreenShoter:ClearComplatePoolTasks"]+". Set deafault value 60.");
-                interval1 = 60;
-            }
-
-                
-            interval1 *= 60000; //Переводим в минуты.
-            timerClearComplatePoolTasks = new Timer((Object stateInfo) =>
-            {
-                ClearPoolTasks();
-            }, null, interval1, interval1);
-
-
-            //Таймер запускающий задачу проверки необходимости очистки кеша.
-            //Проверки корректности данных. Если пользователь введет ерунду.
-            int interval2 = 0;
-            if (!Int32.TryParse(configuration["ScreenShoter:intervalCheckNeedClearCash"], out interval2))
-            {
-                Log.Error("Can't convert parameterScreenShoter: intervalCheckNeedClearCash to Int32. Bad value:" +
-                   configuration["ScreenShoter:intervalCheckNeedClearCash"] + ". Set deafault value 90.");
-                interval2 = 90;
-            }
-
-            interval2 *= 60000;
-
-            //Интревал запуска таймера после старта приложения.
-            int checkNeedClearCashAfterStartup;
-            if (!Int32.TryParse(configuration["ScreenShoter:CheckNeedClearCashAfterStartup"], out checkNeedClearCashAfterStartup))
-            {
-                Log.Error("Can't convert ScreenShoter:CheckNeedClearCashAfterStartup to Int32. Bad value:" +
-                   configuration["ScreenShoter:CheckNeedClearCashAfterStartup"] + ". Set deafault value 90.");
-                checkNeedClearCashAfterStartup = 90;
-            }
-
-
-            timerClearCache = new Timer((Object stateInfo) =>
-            {
-                clearCache();
-            }, null, checkNeedClearCashAfterStartup, interval2);
-        }
-
 
 
         /// <summary>
@@ -289,6 +249,7 @@ namespace ScreenShotGenerator.Services
                     IBrowserControl Bc = new ImpBrowserControlChrome();
                     Bc.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
                     Bc.setTaskId(i + 1); //Ид браузера, что бы потоки как то можно отличать.
+                    Bc.setTimeouts(pageLoadTimeouts, javaScriptTimeouts); //Задаю таймауты загрузки.
                     Bc.startBrowser();//Запустить браузер.
                                       //Пока не понятно нужна ли тут задержка.
                     Bc.processPool(ref poolTask, ref locker, saveBrowserErrorDg); //Запустить обработку пула задач.
@@ -633,6 +594,11 @@ namespace ScreenShotGenerator.Services
 
                 dbContext.SaveChanges();
             }
+
+            //Передаю настройки.
+            poolBrowserSize = m.browserAmount; //Количество запущенных браузеров.
+            browserTasksPerThread = m.tasksAmount; //Количество задач из пула которые браузер обрабатывает за раз.
+            clearCashInterval = m.clearCashInterval; //Интервал очистки кеша, в часах.
         }
 
         /// <summary>
@@ -775,6 +741,62 @@ namespace ScreenShotGenerator.Services
                 db.SaveChanges();
             }
         }
+
+
+        /// <summary>
+        /// Настраивает таймеры.
+        /// </summary>
+        private void createTimers(IConfiguration configuration)
+        {
+            //Очистка завершенных задач.В минутах.
+            int interval1 = parceIntCfgValue(configuration, "ClearComplatePoolTasks", 60);
+            
+            interval1 *= 60000; //Переводим в минуты.
+            timerClearComplatePoolTasks = new Timer((Object stateInfo) =>
+            {
+                ClearPoolTasks();
+            }, null, interval1, interval1);
+
+
+            //Таймер запускающий задачу проверки необходимости очистки кеша.
+            //Проверки корректности данных. Если пользователь введет ерунду.
+            int interval2 = parceIntCfgValue(configuration, "intervalCheckNeedClearCash",90);           
+            interval2 *= 60000;
+
+            //Интревал запуска таймера после старта приложения.
+            int checkNeedClearCashAfterStartup= parceIntCfgValue(configuration, "CheckNeedClearCashAfterStartup",90);
+          
+
+            timerClearCache = new Timer((Object stateInfo) =>
+            {
+                clearCache();
+            }, null, checkNeedClearCashAfterStartup, interval2);
+        }
+
+
+        /// <summary>
+        /// Получает из конфига приложения(appsetting.json) значение для указанного параметра(parametrName)
+        /// пытаеться преобразовать его в Int32, в случае ошибки выводит сообщение в лог и возвращает defaultValue;
+        /// </summary>
+        /// <param name="configuration"></param>
+        /// <param name="parametrName"></param>
+        /// <param name="defaultValue"></param>
+        /// <returns></returns>
+        private int parceIntCfgValue(IConfiguration configuration,string parametrName,int defaultValue)
+        {
+            int parce;
+
+            if (!Int32.TryParse(configuration["ScreenShoter:"+ parametrName], out parce))
+            {
+                Log.Error("Can't convert ScreenShoter:"+ parametrName + " to Int32. Bad value:" +
+                   configuration["ScreenShoter:" + parametrName] + ". Set deafault value "+
+                   defaultValue.ToString()+".");
+                parce = defaultValue;
+            }
+
+            return parce;
+        }
+
 
     }
 }

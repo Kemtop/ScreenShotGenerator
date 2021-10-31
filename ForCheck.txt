@@ -16,3 +16,13 @@ https://localhost:44350/?url[0]=https://yandex.ru/efir?reqid=1601258222163493-15
 
 
 ?url[0]=https://google.ru&allowedReferer=1&useEncoding=1
+
+Сайты вечно загружатели.
+?url[0]=http://artfile.ru/s.php?s=32&allowedReferer=1
+?url[0]=http://xxx.artfile.ru/s.php?s=34&allowedReferer=1 --тут явно видно.
+?url[0]=https://bitkoin-i-ne-tolko.webnode.ru/&allowedReferer=1
+
+
+?url[0]=https://download.cdn.viber.com/desktop/windows/ViberSetup.exe&allowedReferer=1
+
+?url[0]=https://go.skype.com/windows.desktop.download&allowedReferer=1

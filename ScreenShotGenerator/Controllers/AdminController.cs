@@ -18,7 +18,8 @@ using ScreenShotGenerator.Services.BrowserControl;
 
 namespace ScreenShotGenerator.Controllers
 {
-    //[Authorize]
+    [Authorize]
+    [Authorize(Roles = RolesConst.Admin)]
     public class AdminController : Controller
     {
         //Для работы с базой данных.
@@ -44,7 +45,6 @@ namespace ScreenShotGenerator.Controllers
         /// Контроллер админ страницы.
         /// </summary>
         /// <returns></returns>
-       // [Authorize(Roles = RolesConst.Admin)]
         public IActionResult Index()
         {
             //Получаю сведения о настройках сервиса.

@@ -113,7 +113,7 @@ namespace ScreenShotGenerator
                     x.GetRequiredService<IServiceScopeFactory>(),
                     x.GetRequiredService<IConfiguration>(),
                     a=>{
-                        a.timeGo = 1000;
+                        //a.timeGo = 1000;
                         //_configuration["Authentication:Facebook:AppSecret"];
 
                     }));

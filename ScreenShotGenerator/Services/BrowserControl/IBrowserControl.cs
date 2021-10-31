@@ -24,6 +24,13 @@ namespace ScreenShotGenerator.Services.BrowserControl
         void setTaskId(int id);
 
         /// <summary>
+        /// Задает таймауты браузера.
+        /// </summary>
+        /// <param name="pageLoadTimeouts"></param>
+        /// <param name="javaScriptTimeouts"></param>
+        void setTimeouts(int pageLoadTimeouts, int javaScriptTimeouts);
+
+        /// <summary>
         /// Обработка задач в потоке задач. Выполняется бесконечно.
         /// Управляющий процесс запускает в отдельном потоке.
         /// </summary>

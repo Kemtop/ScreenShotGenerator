@@ -388,9 +388,9 @@ namespace TestServices
         /// </summary>
         private string createURLString(List<mTableWebicons> data)
         {
-            //string getStr = "http://192.168.195.129:5000/?";
+            string getStr = "http://192.168.195.129:5000/?";
             //string getStr = "http://localhost:5000/?"; //Linux Host.
-            string getStr = "https://localhost:44350/?";
+            //string getStr = "https://localhost:44350/?";
 
             //http://192.168.195.129:5000/?url[0]=https://google.ru&url[1]=https://google.com&url[2]=https://yandex.com&allowedReferer=1
             int cnt = 0;

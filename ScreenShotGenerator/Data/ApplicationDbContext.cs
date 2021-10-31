@@ -20,7 +20,8 @@ namespace ScreenShotGenerator.Data
 
             //Возникает исключение при играх с сетью.
                 Database.EnsureCreated();
-                Database.Migrate();
+                //Если включено-пытается создать миграцию на готовой БД в linux, при старте системы.
+               // Database.Migrate();
         }
 
         /// <summary>

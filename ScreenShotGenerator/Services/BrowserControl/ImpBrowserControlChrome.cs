@@ -49,12 +49,23 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         /// Задача выборки данных из пула и их обработки.
         /// </summary>
-        private Task workTask;
+        // private Task workTask;
+        private Thread workThread;
+
 
         /// <summary>
         /// Делегат для сохранения сведений об ошибках браузера.
         /// </summary>
         private saveBrowserError saveBrowserErrorDg;
+
+        /// <summary>
+        /// Тайм аут загрузки страницы.
+        /// </summary>
+        private int pageLoadTimeouts;
+        /// <summary>
+        /// Тайм аут загрузки скрипта.
+        /// </summary>
+        private int javaScriptTimeouts;
 
 
         /// <summary>
@@ -78,9 +89,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
             saveBrowserErrorDg = saveBrowserErrorDg_;
 
             threadIsRun = true; //Задача может работать.
-            //Запускаю задачу.
-            workTask = new Task(processPoolThread);
-            workTask.Start();
+                                //Запускаю задачу.
+                                // workTask = new Task(processPoolThread);
+                                // workTask.Start();
+            workThread = new Thread(processPoolThread);
+            workThread.Start();
+
 
             /* Почитай про правильную многопоточность.
              * https://stackoverflow.com/questions/8014037/c-sharp-call-a-method-in-a-new-thread
@@ -105,7 +119,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
             threadIsRun = false; //Остановка процесса обработки задач, если запущен.
             Browser.Quit();
             //Ждем завершения потока.
-            Task.WaitAny(workTask);
+            workThread.Join();
+            //Task.WaitAny(workTask);
         }
 
 
@@ -303,12 +318,58 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 chromeOptions.AddArgument("--disable-component-update");// ";
                 chromeOptions.AddArgument("--disable-desktop-notifications");
                 chromeOptions.AddArgument("--disable-translate");
-                chromeOptions.AddArgument("--enable-download-notification"); 
+                chromeOptions.AddArgument("--enable-download-notification");
+
+
+          
+
+
+                /*
+                 * В Chrome «Разрешить ограничения на загрузку» есть 4 варианта:
+                    0 = нет особых ограничений
+                    1 = блокировать опасные загрузки
+                    2 = блокировать потенциально опасные загрузки
+                    3 = заблокировать все загрузки
+                    4 = блокировать вредоносные загрузки
+                 */
+                //Отключить загрузку файлов.              
+                chromeOptions.AddArgument("--disable-infobars");
+                chromeOptions.AddUserProfilePreference("download_restrictions" , 3);
+                
+
+
+                /*
+                 * driverOptions.AddUserProfilePreference("download.default_directory", BaseCommon._chromeDefaultDownloadsFolder);
+driverOptions.AddUserProfilePreference("intl.accept_languages", "nl");
+driverOptions.AddUserProfilePreference("profile.default_content_settings.popups", "0");
+driverOptions.AddUserProfilePreference("disable-popup-blocking", "true");
+var driverPath = System.IO.Directory.GetCurrentDirectory();
+Instance = new ChromeDriver(driverPath, driverOptions);
+                chromeOptions.AddUserProfilePreference("download.default_directory", Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+chromeOptions.AddUserProfilePreference("download.prompt_for_download", false);
+chromeOptions.AddUserProfilePreference("disable-popup-blocking", "true");
+chromeOptions.AddUserProfilePreference("download.directory_upgrade", true);
+chromeOptions.AddUserProfilePreference("safebrowsing.enabled", true);
+                 */
+
+
+
+
+
+
 
                 //" \"$url\" & sleep ".($timeout * ($i + 1)).
                 //" && DISPLAY=:$DISP gm import -window root -crop 1260x965-0+60 -resize 300 $screen_path";
 
                 Browser = new OpenQA.Selenium.Chrome.ChromeDriver(chromeOptions);
+
+                //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
+                //к тайм ауту взаимодействия с драйвером. Исключаем такую ситуацию.
+                Browser.Manage().Timeouts().PageLoad=TimeSpan.FromSeconds(pageLoadTimeouts);
+                Browser.Manage().Timeouts().AsynchronousJavaScript=TimeSpan.FromSeconds(javaScriptTimeouts);
+
+          
+
 
                 //chromeOptions.AddArgument("---disable-gpu");
                 //chromeOptions.AddArgument("start-maximized"); // open Browser in maximized mode
@@ -568,6 +629,17 @@ driver.get("https://google.com");
             }
 
             return 0;
+        }
+
+        /// <summary>
+        /// Задает тайм ауты.
+        /// </summary>
+        /// <param name="pageLoadTimeouts"></param>
+        /// <param name="javaScriptTimeouts"></param>
+        public void setTimeouts(int pageLoadTimeouts, int javaScriptTimeouts)
+        {
+            this.pageLoadTimeouts = pageLoadTimeouts;
+            this.javaScriptTimeouts = javaScriptTimeouts;
         }
 
 
