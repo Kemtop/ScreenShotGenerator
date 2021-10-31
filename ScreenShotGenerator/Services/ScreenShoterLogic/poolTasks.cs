@@ -98,5 +98,19 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
             return cnt;
         }
 
+
+        /// <summary>
+        /// Удаляет записи, которые хранились более  hour часов.
+        /// </summary>
+        /// <param name="hour"></param>
+        /// <returns></returns>
+        public int clearOld(int hour)
+        {
+            int cnt = pool.Where(x => x.timestamp.AddHours(hour) < DateTime.Now).Count();
+            pool.RemoveAll(x => x.timestamp.AddHours(hour) < DateTime.Now);
+            return cnt;
+        }
+
+
     }
 }

@@ -23,11 +23,51 @@ namespace ScreenShotGenerator.perfomenceService
         /// <summary>
         /// Период мониторинга,в секундах.
         /// </summary>
-        private int intervalMonitoring; 
+        private int intervalMonitoring;
+
+        //Интервал очистки в днях.
+        private int periodClearData;
+
+        /// <summary>
+        /// Таймер очистки таблицы БД.
+        /// </summary>
+        private Timer clearTimer;
+
+
         public perfomanceService(IServiceScopeFactory scopeFactory, IConfiguration configuration)
         {
             this.scopeFactory = scopeFactory;
-            intervalMonitoring = Convert.ToInt32(configuration["perfomanceService:intervalMonitoring"]);
+            
+            //Время мониторинга в секундах.
+            if (!Int32.TryParse(configuration["perfomanceService:intervalMonitoring"], out intervalMonitoring))
+            {
+                Log.Error("Can't convert perfomanceService:intervalMonitoring to Int32. Bad value:" +
+                   configuration["perfomanceService:intervalMonitoring"] + ". Set deafault value 90.");
+                intervalMonitoring = 90;
+            }
+
+          
+            if (!Int32.TryParse(configuration["perfomanceService:periodClearData"], out periodClearData))
+            {
+                Log.Error("Can't convert perfomanceService:periodClearData to Int32. Bad value:" +
+                   configuration["perfomanceService:periodClearData"] + ". Set deafault value 31.");
+                periodClearData = 31;//В днях.
+            }
+
+            //Запускать после старта системы и повторять с таким же интервалом.
+            int runCheckOldDataAfter;
+            if (!Int32.TryParse(configuration["perfomanceService:runCheckOldDataAfter"], out runCheckOldDataAfter))
+            {
+                Log.Error("Can't convert perfomanceService:runCheckOldDataAfter to Int32. Bad value:" +
+                   configuration["perfomanceService:runCheckOldDataAfter"] + ". Set deafault value 600.");
+                runCheckOldDataAfter = 600;
+            }
+
+
+            runCheckOldDataAfter *= 60000;
+            clearTimer = new Timer((object stateInfo)=> {
+                clearDataInDb();
+            },null, runCheckOldDataAfter, runCheckOldDataAfter);
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -105,5 +145,27 @@ namespace ScreenShotGenerator.perfomenceService
             return cpuUsageTotal * 100;
         }
 
+
+        /// <summary>
+        /// Очищает старые данные в базе данных.
+        /// </summary>
+        private void clearDataInDb()
+        {
+            using (var scope = scopeFactory.CreateScope())
+            {
+                ApplicationDbContext _dbContext1 = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                int cnt=_dbContext1.performanceInfo.Where(x=>x.date.AddDays(periodClearData)<DateTime.Now).Count();
+
+                if (cnt == 0) return; //Не чего очищать.
+
+                _dbContext1.performanceInfo.RemoveRange(
+                    _dbContext1.performanceInfo.Where(x => x.date.AddDays(periodClearData) < DateTime.Now)
+                    );
+
+                Log.Information("Clear performanceInfo table's old data. Clear Items="+cnt.ToString());
+                _dbContext1.SaveChanges();
+            }
+
+        }
     }
 }

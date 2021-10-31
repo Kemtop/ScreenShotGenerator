@@ -127,9 +127,31 @@ namespace ScreenShotGenerator.Services
                 enableReadCacheFromDbInStart = false;
             }
 
-            //В минутах.
-            int interval1 = Convert.ToInt32(configuration["ScreenShoter:ClearComplatePoolTasks"]);
-            interval1*= 60000; //Переводим в минуты.
+            createTimers(configuration); //Настраивает таймеры.
+
+            //Делегат для записи ошибок.
+            saveBrowserErrorDg = saveBrowserError;
+
+        }
+
+
+        /// <summary>
+        /// Настраивает таймеры.
+        /// </summary>
+        private void createTimers(IConfiguration configuration)
+        {
+            //Очистка завершенных задач.В минутах.
+            int interval1 = 0;
+            //Проверки корректности данных. Если пользователь введет ерунду.
+            if(!Int32.TryParse(configuration["ScreenShoter:ClearComplatePoolTasks"],out interval1))
+            {
+                Log.Error("Can't convert parameter ScreenShoter:ClearComplatePoolTasks to Int32. Bad value:"+
+                   configuration["ScreenShoter:ClearComplatePoolTasks"]+". Set deafault value 60.");
+                interval1 = 60;
+            }
+
+                
+            interval1 *= 60000; //Переводим в минуты.
             timerClearComplatePoolTasks = new Timer((Object stateInfo) =>
             {
                 ClearPoolTasks();
@@ -137,16 +159,34 @@ namespace ScreenShotGenerator.Services
 
 
             //Таймер запускающий задачу проверки необходимости очистки кеша.
-            int interval2 = Convert.ToInt32(configuration["ScreenShoter:intervalCheckNeedClearCash"]);
+            //Проверки корректности данных. Если пользователь введет ерунду.
+            int interval2 = 0;
+            if (!Int32.TryParse(configuration["ScreenShoter:intervalCheckNeedClearCash"], out interval2))
+            {
+                Log.Error("Can't convert parameterScreenShoter: intervalCheckNeedClearCash to Int32. Bad value:" +
+                   configuration["ScreenShoter:intervalCheckNeedClearCash"] + ". Set deafault value 90.");
+                interval2 = 90;
+            }
+
+            interval2 *= 60000;
+
+            //Интревал запуска таймера после старта приложения.
+            int checkNeedClearCashAfterStartup;
+            if (!Int32.TryParse(configuration["ScreenShoter:CheckNeedClearCashAfterStartup"], out checkNeedClearCashAfterStartup))
+            {
+                Log.Error("Can't convert ScreenShoter:CheckNeedClearCashAfterStartup to Int32. Bad value:" +
+                   configuration["ScreenShoter:CheckNeedClearCashAfterStartup"] + ". Set deafault value 90.");
+                checkNeedClearCashAfterStartup = 90;
+            }
+
+
             timerClearCache = new Timer((Object stateInfo) =>
             {
-               // clearCache();
-            }, null, 1000, interval2 * 60000);
-
-            //Делегат для записи ошибок.
-            saveBrowserErrorDg = saveBrowserError;
-
+                clearCache();
+            }, null, checkNeedClearCashAfterStartup, interval2);
         }
+
+
 
         /// <summary>
         /// Возвращает настройки сервиса для отображения на админ панеле.
@@ -641,6 +681,7 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private void clearCache()
         {
+           
             //clearCashInterval в часах.
             Log.Information("Check cache to need clear.");
 
@@ -651,9 +692,18 @@ namespace ScreenShotGenerator.Services
                 //clearTbCnt  
 
                 int clearTbCnt = 0;//Количество очищенных объектов в таблице. 
+
+                //Текущая дата больше чем дата создания записи+интервал чистки.
                 List<mCashTable> tb = dbContext.screnshotCache.Where(x =>
-             x.timestamp.AddDays(clearCashInterval) > DateTime.Now).ToList();
+                 x.timestamp.AddHours(clearCashInterval) < DateTime.Now).ToList();
                 clearTbCnt=tb.Count();
+
+                if(clearTbCnt==0)
+                {
+                    Log.Information("Nothing clear.");
+                    return;
+                }
+
 
                 //Удаление файлов на диске.
                 Log.Information("Delete from disk."+clearTbCnt.ToString()+" items.");
@@ -674,11 +724,11 @@ namespace ScreenShotGenerator.Services
                 Log.Information("Delete from db.");
                 dbContext.screnshotCache.RemoveRange(
                             dbContext.screnshotCache.Where(x =>
-                            x.timestamp.AddDays(clearCashInterval) > DateTime.Now)
+                            x.timestamp.AddHours(clearCashInterval) < DateTime.Now)
                     );
 
                 dbContext.SaveChanges();
-                Log.Information("Clear " + clearTbCnt.ToString() + " in db cache tables.");
+                Log.Information("End clear " + clearTbCnt.ToString() + " in db cache tables.");
 
             }
 
@@ -687,12 +737,14 @@ namespace ScreenShotGenerator.Services
             {
                 lock (lockCachePool)
                 {
-                   int cnt=poolCache.clearComplate();
+                   //Удаляет записи, которые хранились более  hour часов.
+                   int cnt =poolCache.clearOld(clearCashInterval);
                    Log.Information("Clear " + cnt.ToString() + " in memory cache tables.");
 
                     break;
                 }
 
+                //Жду пока ресурс разблокируеться.
                 Task.Delay(300);
             }                  
 
