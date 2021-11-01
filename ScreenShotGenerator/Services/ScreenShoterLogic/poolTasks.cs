@@ -98,5 +98,18 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
             return cnt;
         }
 
+
+        /// <summary>
+        /// Возвращает firstCnt элементов из пула.
+        /// </summary>
+        /// <param name="firstCnt"></param>
+        /// <returns></returns>
+        public List<mJobPool> getItemInWork(int firstCnt)
+        {
+            // IEnumerable<mJobPool> ret = pool.Where(x => x.status > 0).OrderBy(x => x.id).Take(firstCnt);
+            IEnumerable<mJobPool> ret = pool.OrderByDescending(x => x.id).Take(firstCnt);
+            return ret.ToList();
+        }
+
     }
 }

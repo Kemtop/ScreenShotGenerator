@@ -1,0 +1,43 @@
+﻿@using ScreenShotGenerator.Services.ScreenShoterLogic
+@model List<mJobPool>
+<h3>Пулл задач.</h3>
+<br>
+Расшифровка статусов:
+<br>
+@{
+    foreach (KeyValuePair<int, string> l in ViewBag.nameStatus)
+    {
+        @(l.Value+"="+l.Key)
+        <br>
+    }
+}
+<h4>Выбрано @ViewBag.selectLinesCnt последних записей</h4>
+<div>
+    <table border="1">
+        <tr>
+            <td>Id</td>
+            <td>Статус</td>
+            <td>Браузер</td>
+            <td>URL</td>
+            <td>Файл</td>
+            <td>Время</td>
+        </tr>
+        @{
+            foreach (mJobPool l in Model)
+            {
+                <tr>
+                    <td>@l.id</td>
+                    <td>@l.status</td>
+                    <td>@l.browserId</td>
+                    <td> <a href="@l.url">@l.url</a></td>
+                    <td>
+                        <a href="/imgCache/@l.fileName">
+                            <img src='/imgCache/@l.fileName' width="50%" height="50%">
+                        </a>
+                    </td>
+                    <td>@l.timestamp</td>
+                </tr>
+            }
+        }
+    </table>
+</div>

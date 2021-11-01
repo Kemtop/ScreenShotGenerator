@@ -2,6 +2,7 @@
 using ImageMagick;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using ScreenShotGenerator.Services.Models;
 using ScreenShotGenerator.Services.ScreenShoterLogic;
 using Serilog;
 using SixLabors.ImageSharp;
@@ -152,7 +153,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     if(data.Count>0)
                     {
                         //Блокирует для обработки. Другие потоки не будут обращать внимания на данные объекты.
-                        foreach (mJobPool p in data) p.status = 1;
+                        foreach (mJobPool p in data)
+                        {
+                            p.status = (int)enumTaskStatus.LockByBrowser;
+                            p.browserId = browserId;
+                        }
                     }
 
                 }
@@ -177,7 +182,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     if(String.IsNullOrEmpty(p.url))
                     {
                         string errMsg = "Error:Empty url!";
-                        p.status = 2;
+                        p.status = (int)enumTaskStatus.Error;
                         p.fileName = errMsg;
                         //Сохраняю логи в БД.
                         saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);                        
@@ -223,10 +228,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         {
                             //Были ли ошибки?
                             if (allGood)
-                                p.status = 3; //Все хорошо.
+                                p.status = (int)enumTaskStatus.End; //Все хорошо.
                             else
                             {
-                                p.status = 2;
+                                p.status = (int)enumTaskStatus.Error;
                                 p.fileName = lastError;
                                 //Сохраняю логи в БД.
                                 saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError,lastError, p.url, p.fileName);

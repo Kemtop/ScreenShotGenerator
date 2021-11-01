@@ -19,6 +19,7 @@ using ScreenShotGenerator.Data;
 using Microsoft.Extensions.DependencyInjection;
 using ScreenShotGenerator.Entities;
 using Microsoft.Extensions.Configuration;
+using ScreenShotGenerator.Services.Models;
 
 namespace ScreenShotGenerator.Services
 {
@@ -35,7 +36,7 @@ namespace ScreenShotGenerator.Services
         private readonly IServiceScopeFactory scopeFactory;
 
         //Синхронизация потоков, для работы с общим пулом.
-        static object locker = new object();
+        static object lockPoolTask = new object();
 
         //Блокировка кеши poolCache.
         static object lockCachePool = new object();
@@ -47,8 +48,9 @@ namespace ScreenShotGenerator.Services
         //Полное имя хоста.
         private String hostName = null;
 
-
-        //Пул задач.
+        /// <summary>
+        /// Пул задач.
+        /// </summary>
         poolTasks poolTask;
         int elementId = 0;//Ид элементов в списке. Идентификатор элемента для возможности его сортировки по возрастанию.
 
@@ -89,6 +91,11 @@ namespace ScreenShotGenerator.Services
         /// процесс очистки.
         /// </summary>
         private bool runClearPoolTasks;
+
+        /// <summary>
+        /// Запущен процесс очистки кеши сервиса.
+        /// </summary>
+        private bool runClearCache;
 
         /// <summary>
         /// Токен завершения потока.
@@ -164,6 +171,54 @@ namespace ScreenShotGenerator.Services
 
             return m;
         }
+
+        /// <summary>
+        /// Возвращает список задач у которых статус не новый.
+        /// </summary>
+        /// <param name="top"></param>
+        /// <returns></returns>
+        public List<mJobPool> getPoolTasksInfo(int top)
+        {
+            // Ожидает пока пул задач будет очищен, или прийдет сигнал остановки потока.
+            waitUnlockClearManPoolTask();
+            lock(lockPoolTask)
+            {
+                return poolTask.getItemInWork(top);
+            }
+            
+        }
+
+        /// <summary>
+        /// Возвращает lastCnt последних записей в кеши.
+        /// </summary>
+        /// <param name="lastCnt"></param>
+        /// <returns></returns>
+        public List<mCacheRam> getCacheItems(int lastCnt)
+        {
+            //Нужно гарантированно вернуть результат.
+            //Жду пока разблокируеться объект или не прийдет сигнал остановки.
+            while (!_cancellationToken.IsCancellationRequested)
+            {
+                //Если запущен процесс чистки кеша. Жду окончания.
+                if(runClearCache)
+                {
+                    Task.Delay(300);
+                    continue;
+                }
+
+             
+                lock (lockCachePool)
+                {
+                    return Cache.getLastItems(lastCnt);
+                }
+
+                //Жду пока ресурс разблокируеться.
+                Task.Delay(300);
+            }
+
+            return null;
+        }
+
 
         /// <summary>
         /// Запускает сервис.
@@ -251,7 +306,7 @@ namespace ScreenShotGenerator.Services
                     Bc.setTimeouts(pageLoadTimeouts, javaScriptTimeouts); //Задаю таймауты загрузки.
                     Bc.startBrowser();//Запустить браузер.
                                       //Пока не понятно нужна ли тут задержка.
-                    Bc.processPool(ref poolTask, ref locker, saveBrowserErrorDg); //Запустить обработку пула задач.
+                    Bc.processPool(ref poolTask, ref lockPoolTask, saveBrowserErrorDg); //Запустить обработку пула задач.
                     poolBrowserControls.Add(Bc);
                 }
                 catch (Exception ex)
@@ -264,10 +319,9 @@ namespace ScreenShotGenerator.Services
 
 
         /// <summary>
-        /// Добавляет задачу в пул задач.
+        /// Ожидает пока пул задач будет очищен, или прийдет сигнал остановки потока.
         /// </summary>
-        /// <param name="t"></param>
-        private void addTask(mJobPool t)
+        private void waitUnlockClearManPoolTask()
         {
             //Если начат процесс очистки пула, ждем завершения.
             while (runClearPoolTasks)
@@ -275,12 +329,8 @@ namespace ScreenShotGenerator.Services
                 Task.Delay(1000);
                 if (_cancellationToken.IsCancellationRequested) return;
             }
-
-            poolTask.add(t);
         }
-
-
-
+              
         /// <summary>
         /// Добавляет задачу в пул задач и ждет ее завершения.
         /// </summary>
@@ -315,7 +365,8 @@ namespace ScreenShotGenerator.Services
                     else
                         elementId++;
 
-                    addTask(t);//Добавляю задачу в пулл задач.
+                    waitUnlockClearManPoolTask(); //Если осуществляется очистка пула-ждем.
+                    poolTask.add(t); //Добавляю задачу в пулл задач.
 
                 }
                 else //Нашел выполненную.
@@ -493,13 +544,12 @@ namespace ScreenShotGenerator.Services
 
                 foreach (mCashTable ct in table)
                 {
-                    mJobPool j = new mJobPool();
-                    j.fileName = ct.fileName;
-                    j.timestamp = ct.timestamp;
-                    j.url = ct.url;
-                    j.status = 3; //Задача уже выполнена.
-                    j.inCash = true; //Объект в кеши.
-                    Cache.add(j);
+                    mCacheRam l = new mCacheRam();
+                    l.id = ct.Id;
+                    l.fileName = ct.fileName;
+                    l.timestamp = ct.timestamp;
+                    l.url = ct.url;
+                    Cache.add(l);
                 }
             }
         }
@@ -619,7 +669,7 @@ namespace ScreenShotGenerator.Services
             while (!_cancellationToken.IsCancellationRequested)
             {
                 //Запрещает другим потокам работать с пулом на время его очистки.
-                lock (locker)
+                lock (lockPoolTask)
                 {
                     //Говорю что я начал процесс очистки пула, и добавлять новые задачи в него не нужно.
                     //Иначе будут ошибки. 
@@ -702,9 +752,11 @@ namespace ScreenShotGenerator.Services
             {
                 lock (lockCachePool)
                 {
-                   //Удаляет записи, которые хранились более  hour часов.
-                   int cnt =Cache.clearOld(clearCashInterval);
-                   Log.Information("Clear " + cnt.ToString() + " in memory cache tables.");
+                    //Удаляет записи, которые хранились более  hour часов.
+                    runClearCache = true;
+                    int cnt =Cache.clearOld(clearCashInterval);
+                    runClearCache = false;
+                    Log.Information("Clear " + cnt.ToString() + " in memory cache tables.");
 
                     break;
                 }

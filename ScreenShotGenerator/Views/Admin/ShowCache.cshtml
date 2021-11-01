@@ -1,0 +1,31 @@
+﻿@using ScreenShotGenerator.Services.Models
+@model List<mCacheRam>
+<h3>Кеш.</h3>
+<br>
+
+<h4>Выбрано @ViewBag.selectLinesCnt последних записей</h4>
+<div>
+    <table border="1">
+        <tr>
+            <td>Id</td>
+            <td>URL</td>
+            <td>Файл</td>
+            <td>Время</td>
+        </tr>
+        @{
+            foreach (mCacheRam l in Model)
+            {
+                <tr>
+                    <td>@l.id</td>
+                    <td> <a href="@l.url">@l.url</a></td>
+                    <td>
+                        <a href="/imgCache/@l.fileName">
+                            <img src='/imgCache/@l.fileName' width="50%" height="50%">
+                        </a>
+                    </td>
+                    <td>@l.timestamp</td>
+                </tr>
+            }
+        }
+    </table>
+</div>

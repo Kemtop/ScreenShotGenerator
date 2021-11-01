@@ -1,4 +1,5 @@
 ﻿using ScreenShotGenerator.Models;
+using ScreenShotGenerator.Services.Models;
 using ScreenShotGenerator.Services.ScreenShoterLogic;
 using System;
 using System.Collections.Generic;
@@ -44,5 +45,19 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         /// <returns></returns>
         int getWaitTasksCnt();
+
+        /// <summary>
+        /// Возвращает список задач у которых статус не новый.
+        /// </summary>
+        /// <param name="top"></param>
+        /// <returns></returns>
+        List<mJobPool> getPoolTasksInfo(int top);
+
+        /// <summary>
+        /// Возвращает lastCnt последних записей в кеши.
+        /// </summary>
+        /// <param name="lastCnt"></param>
+        /// <returns></returns>
+        List<mCacheRam> getCacheItems(int lastCnt);
     }
 }

@@ -30,5 +30,10 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
         /// Флаг нахождения объекта из кеши. Что бы повторно его не вставлять.
         /// </summary>
         public bool inCash;
+
+        /// <summary>
+        /// Идентификатор браузера, который взялся выполнять задачу.
+        /// </summary>
+        public int browserId;
     }
 }

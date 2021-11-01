@@ -15,11 +15,13 @@ using ScreenShotGenerator.Entities;
 using ScreenShotGenerator.Models;
 using ScreenShotGenerator.Services;
 using ScreenShotGenerator.Services.BrowserControl;
+using ScreenShotGenerator.Services.Models;
+using ScreenShotGenerator.Services.ScreenShoterLogic;
 
 namespace ScreenShotGenerator.Controllers
 {
-    [Authorize]
-    [Authorize(Roles = RolesConst.Admin)]
+  //  [Authorize]
+  //  [Authorize(Roles = RolesConst.Admin)]
     public class AdminController : Controller
     {
         //Для работы с базой данных.
@@ -237,12 +239,9 @@ namespace ScreenShotGenerator.Controllers
             List<mBrowserErrors> data = _dbContext.browserErrors.OrderByDescending(x=>x.Id).Take(selectLinesCnt).ToList();
 
             //Названия ошибок.
-            var nameLevels = new Dictionary<int, string>();
-            foreach (var name in Enum.GetNames(typeof(enumBrowserError)))
-            {
-                nameLevels.Add((int)Enum.Parse(typeof(enumBrowserError), name), name);
-            }
-
+            // Возвращает словарь имя=значение перечисления.
+            Dictionary<int, string> nameLevels = getNamesEnum(typeof(enumBrowserError));
+           
             ViewBag.selectLinesCnt = selectLinesCnt;
             ViewBag.nameLevels = nameLevels;
             return View(data);
@@ -441,12 +440,6 @@ namespace ScreenShotGenerator.Controllers
         }
 
 
-
-
-
-
-
-
         /// <summary>
         /// Выход.
         /// </summary>
@@ -460,6 +453,56 @@ namespace ScreenShotGenerator.Controllers
 
 
 
+        /// <summary>
+        /// Просмотр пула задач.
+        /// </summary>
+        /// <returns></returns>
+        public  async Task<IActionResult> ShowTaskPool()
+        {
+            //Получаю информацию о состоянии пула. Последние last записей.
+             const int last = 50;
+             List<mJobPool> tasks= await Task.Run(()=>_screenShoter.getPoolTasksInfo(last));
 
+            //List<mBrowserErrors> data = _dbContext.browserErrors.OrderByDescending(x => x.Id).Take(selectLinesCnt).ToList();
+
+            //Названия статусов.
+            ViewBag.nameStatus = getNamesEnum(typeof(enumTaskStatus));
+            ViewBag.selectLinesCnt = last;
+            
+            return View(tasks);
+        }
+
+       
+        /// <summary>
+        /// Просмотр кеши.
+        /// </summary>
+        /// <returns></returns>
+        public async Task<IActionResult> ShowCache()
+        {
+            //Получаю кеш. Последние last записей.
+            const int last = 50;
+            List<mCacheRam> cache = await Task.Run(() => _screenShoter.getCacheItems(last));
+
+            //Названия статусов.
+            ViewBag.selectLinesCnt = last;
+
+            return View(cache);
+        }
+
+
+        /// <summary>
+        /// Возвращает словарь имя=значение перечисления.
+        /// </summary>
+        /// <returns></returns>
+        private Dictionary<int, string> getNamesEnum(Type t)
+        {
+            Dictionary<int, string> nameValues = new Dictionary<int, string>();
+            foreach (var name in Enum.GetNames(t))
+            {
+                nameValues.Add((int)Enum.Parse(t, name), name);
+            }
+
+            return nameValues;
+        }
     }
 }
