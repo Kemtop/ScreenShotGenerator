@@ -67,6 +67,18 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private int javaScriptTimeouts;
 
+        /// <summary>
+        /// Путь к текущей папке.
+        /// </summary>
+        private string curentDirectory;
+
+
+        public ImpBrowserControlChrome()
+        {
+            //Путь к рабочей директории приложения.
+            curentDirectory = Directory.GetCurrentDirectory();
+        }
+           
 
         /// <summary>
         /// Задает идентификатор потока.
@@ -157,26 +169,31 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
 
                 foreach (mJobPool p in data)
-                {
+                {                    
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
 
                     //Проверка урл на пустоту.
                     if(String.IsNullOrEmpty(p.url))
                     {
-                        p.path = "Error:Empty url!";
+                        string errMsg = "Error:Empty url!";
                         p.status = 2;
+                        p.fileName = errMsg;
                         //Сохраняю логи в БД.
-                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, p.path, p.url, p.fileName);
+                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);                        
                         continue;
                     }
 
 
-
+                    String lastError = null; //Последнее сообщение об ошибке, если есть.
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
+                    //Путь куда сохранять файл.
+                    string filePath = Path.Combine("wwwroot/" + tmpDir, p.fileName);
+                
+                   
                     //Cоздание скриншота.
                    // Log.Information("take "+p.url+";Browser="+browserId.ToString());
-                    string err=takeScreenShot(p.url, p.fileName);
+                    string err=takeScreenShot(p.url, filePath,p.fileName);
                     //Log.Information("end " + p.url + ";Browser=" + browserId.ToString());
 
                     //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
@@ -189,37 +206,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     //Ошибка создания скрин шота.
                     if(err!=null)
                     {
-                        p.path = err;
+                        lastError= err;
                         allGood = false;
                     }
                     else
-                    {
-                        //Полный путь.
-                        string path = Path.Combine("wwwroot/" + tmpDir, p.fileName);
-
-                        //Почему то файл не создался. 
-                        if (!checkExistFile(path))
-                        {
-                            p.path = "File no exist.";
-                            allGood = false;
-                        }
-
-
-                        //Почему то файл пуст. 
-                        if (!checkFileSize(path))
-                        {
-                            p.path = "File length is 0.";
-                            allGood = false;
-                        }
-
-                        //Проверяет не вернул ли браузер черную или белую картинку.
-                        int chkColorErr = imgOnlyBlackOrWhite(path);
-                        if(chkColorErr!=0)
-                        {
-                            p.path = "Image contains only "+((chkColorErr==1)?"white":"black")+" pixels.";
-                            allGood = false;                           
-                        }
-                        
+                    {                        
+                        // Проверяет итоговый файл на существование, на размер,
+                        // и на заполнение только белым или только черным.
+                        allGood = checkResultFile(out lastError,filePath);
                     }                  
                  
                     //Пока пул не будет доступен. Или поток не остановят.
@@ -233,8 +227,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
                             else
                             {
                                 p.status = 2;
+                                p.fileName = lastError;
                                 //Сохраняю логи в БД.
-                                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, p.path, p.url, p.fileName);
+                                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError,lastError, p.url, p.fileName);
                             }
                                 
 
@@ -247,6 +242,43 @@ namespace ScreenShotGenerator.Services.BrowserControl
                   
                 }
             }
+        }
+
+        /// <summary>
+        /// Проверяет итоговый файл на существование, на размер, и на заполнение только белым или только черным.
+        /// Если все хорошо=true.
+        /// </summary>
+        /// <param name="errMess"></param>
+        /// <param name="pathToFile"></param>
+        /// <returns></returns>
+        private bool checkResultFile(out string errMess,string pathToFile)
+        {
+            errMess = null;
+
+            //Почему то файл не создался. 
+            if (!checkExistFile(pathToFile))
+            {
+                errMess = "File no exist.";
+                return false;
+            }
+
+
+            //Почему то файл пуст.
+            if (!checkFileSize(pathToFile))
+            {
+                errMess = "File length is 0.";
+                return false;
+            }
+
+            //Проверяет не вернул ли браузер черную или белую картинку.
+            int chkColorErr = imgOnlyBlackOrWhite(pathToFile);
+            if (chkColorErr != 0)
+            {
+                errMess = "Image contains only " + ((chkColorErr == 1) ? "white" : "black") + " pixels.";
+                return false;
+            }
+
+            return true;
         }
 
 
@@ -450,7 +482,7 @@ driver.get("https://google.com");
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        private string takeScreenShot(string url, string filename)
+        private string takeScreenShot(string url, string filePath,string filename)
         {
            
                 //Выполняю проверку живой ли браузер.
@@ -541,10 +573,12 @@ driver.get("https://google.com");
 
 
                     //var fileName = Path.GetFileName("screen" + DateTime.Now.ToString("hh_mm_ss_fff") + ".jpg");
-                    var fileName = Path.GetFileName(filename);
-                    var filePath = Path.Combine(Directory.GetCurrentDirectory(), @"wwwroot/" + tmpDir, fileName);
+                    // var fileName = Path.GetFileName(filename);
+                    // var filePathFull = Path.Combine(curentDirectory, @"wwwroot/" + tmpDir, fileName);
+                    string filePathFull = Path.Combine(curentDirectory,filePath);
 
-                    image.Save(filePath, new JpegEncoder() { Quality = 85 });
+
+                    image.Save(filePathFull, new JpegEncoder() { Quality = 85 });
 
                     //  image.Save("screen" + DateTime.Now.ToString("hh_mm_ss_fff") + ".jpg",
                     //        new JpegEncoder() { Quality = 85 });

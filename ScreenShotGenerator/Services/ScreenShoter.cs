@@ -53,8 +53,10 @@ namespace ScreenShotGenerator.Services
         int elementId = 0;//Ид элементов в списке. Идентификатор элемента для возможности его сортировки по возрастанию.
 
 
-        //Кешь уже созданых скриншотов. Хранит сведения о них. Заполняется в процессе работы сервиса.
-        poolTasks poolCache;
+        /// <summary>
+        ///Кэш уже созданых скриншотов. Хранит сведения о них. Заполняется в процессе работы сервиса.
+        /// </summary>
+        cacheRam Cache;
 
 
         //Пул объектов для управления браузерами.
@@ -121,16 +123,13 @@ namespace ScreenShotGenerator.Services
             poolTask = new poolTasks();
             poolTask.tmpDir = tmpDir; //Директория для хранения скриншотов.
 
-            poolCache = new poolTasks();
+            Cache = new cacheRam();
             poolBrowserControls = new List<IBrowserControl>();
 
             //Чтение настроек сервиса.
             readSettingsFromDb();
 
-            //Задаю настройки переодическим действиям. Тест можно удалить.
-            action(this);
-
-
+            //Выключает чтение кеши с базы данных.
             if (configuration["ScreenShoter:enableReadCacheFromDbInStart"] == "false")
             {
                 enableReadCacheFromDbInStart = false;
@@ -158,7 +157,7 @@ namespace ScreenShotGenerator.Services
             m.browserAmount = poolBrowserSize;  //Количество запущенных браузеров.
             m.tasksAmount = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
             m.clearCashInterval = clearCashInterval; //Интервал очистки кеша, в часах.
-            m.cacheElementsCnt = poolCache.cacheCnt();
+            m.cacheElementsCnt = Cache.Count();
 
             //Количество элементов обрабатываемых на данный момент.
             m.curentElementsInProcessCnt = poolTask.curentElementsInProcessCnt();
@@ -302,7 +301,7 @@ namespace ScreenShotGenerator.Services
                 mJobPool t; //Задача.
 
                 //Поиск выполненной задачи в кеш сервиса.
-                mJobPool cashValue = poolCache.findUrl(url);
+                mJobPool cashValue = Cache.findUrl(url);
 
                 if (cashValue == null) //Задача не была выполнена,добавляю в пул.
                 {
@@ -404,7 +403,7 @@ namespace ScreenShotGenerator.Services
                 //Возникла ошибка.
                 if (j.status == 2)
                 {
-                    userLine.log = j.path;
+                    userLine.log = j.fileName;
                     userLine.status = 0;
                 }
 
@@ -426,7 +425,7 @@ namespace ScreenShotGenerator.Services
             {
                 lock (lockCachePool)
                 {
-                    poolCache.add(j);
+                    Cache.add(j);
                     break;
                 }
 
@@ -500,7 +499,7 @@ namespace ScreenShotGenerator.Services
                     j.url = ct.url;
                     j.status = 3; //Задача уже выполнена.
                     j.inCash = true; //Объект в кеши.
-                    poolCache.add(j);
+                    Cache.add(j);
                 }
             }
         }
@@ -517,7 +516,7 @@ namespace ScreenShotGenerator.Services
                 //Выбираем только ошибки.
                 if (j.status == 2)
                 {
-                    string str = userIP + ";" + j.url + ";" + j.path;
+                    string str = userIP + ";" + j.url + ";" + j.fileName;
                     Log.Error(str);
                 }
 
@@ -704,7 +703,7 @@ namespace ScreenShotGenerator.Services
                 lock (lockCachePool)
                 {
                    //Удаляет записи, которые хранились более  hour часов.
-                   int cnt =poolCache.clearOld(clearCashInterval);
+                   int cnt =Cache.clearOld(clearCashInterval);
                    Log.Information("Clear " + cnt.ToString() + " in memory cache tables.");
 
                     break;

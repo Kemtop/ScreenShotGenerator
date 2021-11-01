@@ -22,11 +22,6 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
         public string fileName;
 
         /// <summary>
-        /// url путь к файлу.
-        /// </summary>
-        public string path { get; set; }
-
-        /// <summary>
         /// Временный отпечаток создания файла.
         /// </summary>
         public DateTime timestamp;
