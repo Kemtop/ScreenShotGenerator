@@ -293,7 +293,7 @@ namespace ScreenShotGenerator.Services
             for (int i = 0; i < poolBrowserSize; i++)
             {
                 Log.Information("Create browser " + (i + 1).ToString()); //Вывод информации.
-
+                
                 try
                 {
                     IBrowserControl Bc = new ImpBrowserControlChrome();
@@ -341,7 +341,7 @@ namespace ScreenShotGenerator.Services
             mJobPool task = null;
             int cnt = poolTask.curentWaitElements(); //Количество ожидающих задач.
             //Больше чем браузер обрабатывает за раз.
-            if (cnt > browserTasksPerThread)
+            if (cnt > browserTasksPerThread+25)
             {
                 task = new mJobPool();
                 task.id = -1;
@@ -435,8 +435,12 @@ namespace ScreenShotGenerator.Services
                 double elipsed = stopwatch.Elapsed.TotalSeconds;
                 if(elipsed>50)
                 {
+                    //Устанавливает сообщение об ошибки по истечению тайм аута обработки.
+                    setTimeOutError(ref jb);
                     return generateAnswer(ref jb, userIP);
                 }
+
+               
             }
 
             return null;
@@ -460,6 +464,22 @@ namespace ScreenShotGenerator.Services
 
         }
 
+        /// <summary>
+        /// Устанавливает сообщение об ошибки по истечению тайм аута обработки.
+        /// </summary>
+        /// <param name="jb"></param>
+        private void setTimeOutError(ref List<mJobPool> jb)
+        {
+            foreach (mJobPool j in jb)
+            {
+                //Возникла ошибка.
+                if (j.status == (int)enumTaskStatus.NewTask)
+                {
+                    j.fileName = "Tool long wait complete request from browser.";
+                    j.status = 2;
+                }
+            }
+        }
 
         /// <summary>
         /// Получение корневого url, если уже его не получили.

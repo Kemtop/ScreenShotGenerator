@@ -29,3 +29,5 @@ https://localhost:44350/?url[0]=https://yandex.ru/efir?reqid=1601258222163493-15
 
 
 ?url[0]=https://google.ru&allowedReferer=1
+
+?url[0]=https://mail.ru&allowedReferer=1

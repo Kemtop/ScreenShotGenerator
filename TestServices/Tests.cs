@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Serilog;
+using Serilog.Events;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,7 +18,7 @@ namespace TestServices
     {
         //Список url.
         List<mTableWebicons> urls = new List<mTableWebicons>();
-        object locker = new object();//Объект для блокировки общиго ресурса.
+        object lockUrlsList = new object();//Объект для блокировки общиго ресурса.
         object lockDb = new object();//Объект для блокировки доступа к БД.
 
         //Количество скриншотов выполняемые одним потоком за раз.
@@ -24,61 +26,153 @@ namespace TestServices
 
         dbContext db = new dbContext();
 
-
-
         public Tests()
         {
             db.Database.Migrate();
+
+            //Подключаю serilog.  
+            Log.Logger = new LoggerConfiguration()
+           .MinimumLevel.Information()
+           .MinimumLevel.Override("Microsoft", LogEventLevel.Warning) //Выводить только варнинги Microsoft.
+           .WriteTo.Console()
+           .WriteTo.File(
+                @"./Logs/log.txt",
+                shared: true, //Доступен всем процессам.
+                rollingInterval: RollingInterval.Day,
+                flushToDiskInterval: TimeSpan.FromSeconds(20),
+                outputTemplate: "{Timestamp:HH:mm:ss.fff} [{Level}] {Message}{NewLine}{Exception}")
+           .CreateLogger();
         }
 
 
         /// <summary>
-        /// Один поток и большие запросы.
+        /// Запускает однопоточный тест.
         /// </summary>
-        public void Test1()
-        {
+        public void runTest1()
+        {          
+            int tasks = getFromUserTaskPerRequest(10);
+
+            //Данные хостов.
+            Dictionary<int, string> hosts = new Dictionary<int, string>();
+            hosts.Add(1, "https://localhost:44350");
+            hosts.Add(2, "http://192.168.195.129:5000");
+            hosts.Add(3, "http://localhost:5000");
+
+            //Спрашиваю у пользователя.
+            int hostKey=getFromUserНost(hosts);
+
+
+            Log.Information("Run Test1.");
             Console.WriteLine("Read file.");
+            // prepareRundomFile(); //Ручная генерация.
 
-            // prepareRundomFile();
-             readFile2(ref urls);
-             taskTest1(1);
-
-
-
+            //Читаю файл в список.
+            readFileFormatLinks(@"links.txt");
+            taskTest1(1,tasks,hosts[hostKey]);
         }
 
 
 
-
-
-        public void run()
+        /// <summary>
+        /// Спрашиваю у пользователя сколько задач отправлять за один запрос.
+        /// </summary>
+        /// <returns></returns>
+        private int getFromUserTaskPerRequest(int defaultValue)
         {
-            //Читаю данные.
-            readFile(ref urls);
-            //Начинаю тест с позиции 381.
-            int i = 0;
-            foreach (mTableWebicons m in urls)
+                Console.WriteLine("Enter amount of tasks per request, or press Enter to set defaul value "
+                    +defaultValue.ToString());
+
+            int res = 0;
+            //Ждем пока пользователь введет число.
+            while (true)
             {
-                if (i > 380) break;
-                m.status = 1;
-                i++;
+                string key = Console.ReadLine();
+                //Пользователь нажал Enter.
+                if (String.IsNullOrEmpty(key)) return defaultValue;
+
+                if (Int32.TryParse(key, out res))
+                {
+                    break;
+                }
+                else
+                {
+                    Console.WriteLine("Error value!");
+                }
+
             }
 
-            Thread thread1 = new Thread(() => taskTest(1));
-            Thread thread2 = new Thread(() => taskTest(2));
-            Thread thread3 = new Thread(() => taskTest(3));
+            return res;
+        }
 
-            thread1.Start();
-            thread2.Start();
-            thread3.Start();
+               
+        /// <summary>
+        /// Спрашиваю у пользователя хост.
+        /// </summary>
+        /// <param name="hosts"></param>
+        /// <returns></returns>
+        private int getFromUserНost(Dictionary<int, string> hosts)
+        {
+            
+            Console.WriteLine("Select host.");
+            foreach(KeyValuePair<int,string> p in hosts)
+            {
+                Console.WriteLine(p.Key.ToString()+" "+p.Value);
+            }
 
-            Console.WriteLine("End");
-            int y = 0;
+            int res = 0;
+            //Ждем пока пользователь введет число.
+            while (true)
+            {
+                string key = Console.ReadLine();
+                if (Int32.TryParse(key, out res))
+                {
+                    //Проверяю что ввел пользователь.
+                    foreach (KeyValuePair<int, string> p in hosts)
+                    {
+                        if(p.Key==res) return res; 
+                    }
 
+                    //Ввел ерунду.
+                    Console.WriteLine("Bad value!");
+
+                }
+                else
+                {
+                    Console.WriteLine("Error value!");
+                }
+
+            }            
         }
 
 
 
+        /// <summary>
+        /// Читает файл в котором на каждой строке находится только url сайта.
+        /// </summary>
+        /// <param name="path"></param>
+        public void readFileFormatLinks(string path)
+        {
+            int id = 0;
+
+            foreach (string line in System.IO.File.ReadLines(path))
+            {
+
+                mTableWebicons m = new mTableWebicons();
+                m.url = line.Trim();
+                m.id = id;
+                id++;
+
+                urls.Add(m);
+
+            }
+        }
+
+
+        /// <summary>
+        /// Метод преобразования структуированных по алфавиту строк в файле, 
+        /// в файл с перемешанным списком. Вызывать только из студии, есть проблеммы 
+        /// с большим количеством записей.
+        /// </summary>
         void prepareRundomFile()
         {
             List<mTableWebicons> tmp = new List<mTableWebicons>();
@@ -127,34 +221,10 @@ namespace TestServices
 
                 
             }
-
-
-
-            
+                                    
         }
 
-
-        public void readFile2(ref List<mTableWebicons> urls)
-        {
-            int id = 0;
-
-            foreach (string line in System.IO.File.ReadLines(@"links.txt"))
-            {
-
-                    mTableWebicons m = new mTableWebicons();
-                    m.url = line.Trim();
-                    m.id = id;
-                    id++;
-
-                    urls.Add(m);
-
-                
-            }
-        }
-
-
-
-
+       
         /// <summary>
         /// Читает файл с http запросами. Вида
         /// INSERT INTO `websites_online` (`element_url`) VALUES
@@ -206,7 +276,10 @@ namespace TestServices
         }
 
 
-
+        /// <summary>
+        /// Читаю файл первоначального формата. Будет ли он еще не понятно.
+        /// </summary>
+        /// <param name="urls"></param>
         public void readFile(ref List<mTableWebicons> urls)
         {
 
@@ -246,6 +319,34 @@ namespace TestServices
 
         }
 
+        //Старый тест, переделать и использовать таски!
+        public void run()
+        {
+            //Читаю данные.
+            readFile(ref urls);
+            //Начинаю тест с позиции 381.
+            int i = 0;
+            foreach (mTableWebicons m in urls)
+            {
+                if (i > 380) break;
+                m.status = 1;
+                i++;
+            }
+
+            Thread thread1 = new Thread(() => taskTest(1));
+            Thread thread2 = new Thread(() => taskTest(2));
+            Thread thread3 = new Thread(() => taskTest(3));
+
+            thread1.Start();
+            thread2.Start();
+            thread3.Start();
+
+            Console.WriteLine("End");
+            int y = 0;
+
+        }
+
+
         /// <summary>
         /// Поток выполняющий тестирование сервиса.
         /// </summary>
@@ -258,7 +359,7 @@ namespace TestServices
             while (work)
             {
 
-                lock (locker)
+                lock (lockUrlsList)
                 {
                     //Получаю первые screeShotPerThread не обработанных url.
                     IEnumerable<mTableWebicons> dataLinq = urls.Where(x => x.status == 0).OrderBy(x => x.id).Take(screeShotPerThread);
@@ -276,7 +377,7 @@ namespace TestServices
                 }
 
                 //Формирую строку get запроса.
-                string request = createURLString(data);
+                string request = createURLString(data,"");
                 stopWatch.Start();
                 string jsonAnswer = sendGet(request);
 
@@ -298,8 +399,7 @@ namespace TestServices
                 string elapsedTime = s.ToString("0.00");
 
                 //Сохраняет результаты в БД.
-                saveResults(s, jsonAnswer, request);
-
+                saveResults(elapsedTime, jsonAnswer, request);
 
                 Console.WriteLine("Thread" + threadNum.ToString() + "  EndId=" + data[screeShotPerThread - 1].id.ToString());
 
@@ -314,7 +414,7 @@ namespace TestServices
         /// <summary>
         /// Поток выполняющий тестирование сервиса по новому алгоритму.
         /// </summary>
-        private void taskTest1(int threadNum)
+        private void taskTest1(int threadNum,int screeShotPerThread,string hostName)
         {
             List<mTableWebicons> data;
             bool work = true;
@@ -325,7 +425,8 @@ namespace TestServices
             while (work)
             {
                    //Получаю первые screeShotPerThread не обработанных url.
-                    IEnumerable<mTableWebicons> dataLinq = urls.Where(x => x.status == 0).OrderBy(x => x.id).Take(10);
+                    IEnumerable<mTableWebicons> dataLinq = 
+                    urls.Where(x => x.status == 0).OrderBy(x => x.id).Take(screeShotPerThread);
                     data = dataLinq.ToList();
 
                     //Нет больше данных тест окончен.
@@ -340,22 +441,20 @@ namespace TestServices
                     pos+= data.Count; //Количество новых объектов для обработки.
 
                     
-
                 //Формирую строку get запроса.
-                string request = createURLString(data);
+                string request = createURLString(data,hostName);
 
-                stopWatch.Reset();
+                stopWatch.Reset(); //Замер времени выполнения запроса.
                 stopWatch.Start();
-                Console.Write(DateTime.Now);
-                Console.WriteLine("Send request");
+
+                Log.Information("Send request");
 
                 string jsonAnswer = sendGet(request);
 
                 //Обработка исключений.
                 while (jsonAnswer == null)
                 {
-
-                    Console.WriteLine("Thread " + threadNum.ToString() + "Exception  ");
+                    String msg = "Thread " + threadNum.ToString() + "Exception  ";
                     Thread.Sleep(500);
                     jsonAnswer = sendGet(request);
 
@@ -363,19 +462,18 @@ namespace TestServices
 
 
                 stopWatch.Stop();
-                Console.Write(DateTime.Now);
-                Console.WriteLine(" End request");
+                Log.Information(" End request");
 
 
                 TimeSpan ts = stopWatch.Elapsed;
                 double s = ts.TotalSeconds;
-                string elapsedTime = s.ToString("0.00");
+                string elapsedTime = s.ToString("N2");
 
                 //Сохраняет результаты в БД.
                 saveResults(s, jsonAnswer, request);
 
-
-                Console.WriteLine("Thread" + threadNum.ToString() + " curPos="+pos.ToString());
+                Log.Information("Thread" + threadNum.ToString() + "completed " +
+                    pos.ToString() + " line. " + screeShotPerThread.ToString() + " screens " + elapsedTime + " second."); ;
 
             }
 
@@ -386,56 +484,31 @@ namespace TestServices
         /// <summary>
         /// Формирую параметры для get запроса.
         /// </summary>
-        private string createURLString(List<mTableWebicons> data)
+        private string createURLString(List<mTableWebicons> data, string hostName)
         {
-            string getStr = "http://192.168.195.129:5000/?";
-            //string getStr = "http://localhost:5000/?"; //Linux Host.
-            //string getStr = "https://localhost:44350/?";
-
-            //http://192.168.195.129:5000/?url[0]=https://google.ru&url[1]=https://google.com&url[2]=https://yandex.com&allowedReferer=1
+            string getStr = hostName+ "/?"; 
+            
             int cnt = 0;
-            //Нужно кодировать запрос,так как есть символ #.
-            bool needEncoding = false;
-
-            //Всегда кодировать спец символы.
-            needEncoding = true;
-
-            //Проверка наличия символа # в url.
-            /*
-            foreach (mTableWebicons m in data)
-            {
-                if (m.url.Contains('#'))
-                {
-                    needEncoding = true;
-                    break;
-                }
-            }
-            */
+   
 
             foreach (mTableWebicons m in data)
             {
-                //getStr += "url[" + cnt.ToString() + "]=https://" + m.url + "&";
                 getStr += "url[" + cnt.ToString() + "]=";
-
-                if (needEncoding)
-                {
-                    getStr +=HttpUtility.UrlEncode(m.url);
-                }
-
+                getStr +=HttpUtility.UrlEncode(m.url);
                 getStr += "&";
                               
-
                 cnt++;
             }
             getStr += "allowedReferer=1";
 
-            //if (needEncoding)
-             //   getStr += "&useEncoding=1";
-
             return getStr;
         }
 
-
+        /// <summary>
+        /// Отправляет GET запрос с параметрами.
+        /// </summary>
+        /// <param name="uri"></param>
+        /// <returns></returns>
         string sendGet(string uri)
         {
             try
@@ -456,8 +529,9 @@ namespace TestServices
                 err.url = uri;
                 err.error = "Exception in  sendGet:" + ex.Message;
                 err.create = DateTime.Now;
-                Console.WriteLine("URl="+uri);
-                Console.WriteLine(err.error);
+
+                string msg = err.error + " ;URl = " + uri;
+                Log.Error(msg);
 
                 lock (lockDb)
                 {
@@ -474,16 +548,12 @@ namespace TestServices
 
 
 
-
-
-
-
         /// <summary>
         /// Сохраняет результаты в БД.
         /// </summary>
         /// <param name="elapsedTime"></param>
         /// <param name="ret"></param>
-        void saveResults(double elapsedTime, string jsonAnswer, string url)
+        void saveResults(string elapsedTime, string jsonAnswer, string url)
         {
 
             List<mRetJson> ret=null;
