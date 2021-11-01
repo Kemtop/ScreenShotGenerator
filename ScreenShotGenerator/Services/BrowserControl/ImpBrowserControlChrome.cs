@@ -3,7 +3,7 @@ using ImageMagick;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using ScreenShotGenerator.Services.Models;
-using ScreenShotGenerator.Services.ScreenShoterLogic;
+using ScreenShotGenerator.Services.ScreenShoterPools;
 using Serilog;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -19,40 +19,34 @@ using System.Threading.Tasks;
 
 namespace ScreenShotGenerator.Services.BrowserControl
 {
+    /// <summary>
+    /// Реализация управления браузером Chrome.
+    /// </summary>
     public class ImpBrowserControlChrome : IBrowserControl
     {
         /// <summary>
-        /// Объект для управления браузером.
+        /// Объект для управления браузером(драйвер).
         /// </summary>
-        IWebDriver Browser;
+        private IWebDriver Browser;
 
         //Пул задач.
-        poolTasks poolTasks;
+        private poolTasks poolTasks;
         /// <summary>
         /// Разрешен запуск потока. Флаг используется для остановки потока.
         /// </summary>
         private bool threadIsRun;
 
         //Синхронизация потоков.
-        object locker;
-
-        /// <summary>
-        /// Количество задач из пула которые браузер обрабатывает за раз.
-        /// </summary>
-        public int tasksPerThread { get; set; }
+        private object lockPoolTasks;
 
         //Директория для хранения картинок.
         private string tmpDir;
-
-        //Идентификатор браузера.
-        private int browserId=0;
 
         /// <summary>
         /// Задача выборки данных из пула и их обработки.
         /// </summary>
         // private Task workTask;
         private Thread workThread;
-
 
         /// <summary>
         /// Делегат для сохранения сведений об ошибках браузера.
@@ -74,6 +68,18 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private string curentDirectory;
 
 
+
+        /// <summary>
+        /// Количество задач из пула которые браузер обрабатывает за раз.
+        /// </summary>
+        public int tasksPerThread { get; set; }
+
+        /// <summary>
+        /// Идентификатор браузера.
+        /// </summary>
+        public int browserId { get; set; }
+
+
         public ImpBrowserControlChrome()
         {
             //Путь к рабочей директории приложения.
@@ -82,23 +88,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
            
 
         /// <summary>
-        /// Задает идентификатор потока.
-        /// </summary>
-        /// <param name="id"></param>
-       public void setTaskId(int id)
-        {
-            browserId = id;
-        }
-
-        /// <summary>
         /// Обработка задач в потоке задач. Выполняется запускает отдельный процесс для проверки и обработки задачи.
         /// </summary>
         /// <param name="poolTasks"></param>
-        public void processPool(ref poolTasks pool, ref object locker, saveBrowserError saveBrowserErrorDg_)
+        public void processPool(ref poolTasks pool, ref object locker, saveBrowserError saveBrowserErrorDg_, string tmpDir)
         {
             this.poolTasks = pool;
-            tmpDir = pool.tmpDir; 
-            this.locker = locker;
+            this.lockPoolTasks = locker;
+            this.tmpDir = tmpDir;
             saveBrowserErrorDg = saveBrowserErrorDg_;
 
             threadIsRun = true; //Задача может работать.
@@ -107,20 +104,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
                                 // workTask.Start();
             workThread = new Thread(processPoolThread);
             workThread.Start();
-
-
-            /* Почитай про правильную многопоточность.
-             * https://stackoverflow.com/questions/8014037/c-sharp-call-a-method-in-a-new-thread
-             * Action secondFooAsync = new Action(SecondFoo);
-             */
         }
 
         /// <summary>
         /// Запуск браузера.
         /// </summary>
-        public void startBrowser()
+        public bool startBrowser()
         {
-            runBrowser();
+           return runBrowser();
         }
 
 
@@ -137,6 +128,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
 
+        /// <summary>
+        /// Проверяет есть ли в пуле новые задачи, выполняет их.
+        /// </summary>
         private void processPoolThread()
         {
             while (threadIsRun)
@@ -145,7 +139,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 List<mJobPool> data=null; 
 
                 //Блокирую пул для других потоков.
-                lock (locker)
+                lock (lockPoolTasks)
                 {
                     data = poolTasks.getNeedProcessing(tasksPerThread);
 
@@ -224,7 +218,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     //Пока пул не будет доступен. Или поток не остановят.
                     while(threadIsRun)
                     {
-                        lock(locker)
+                        lock(lockPoolTasks)
                         {
                             //Были ли ошибки?
                             if (allGood)
@@ -331,9 +325,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
 
-        private void runBrowser()
+        /// <summary>
+        /// Настраивает драйвер, и вызвает запуск браузера.
+        /// </summary>
+        private bool runBrowser()
         {
-
             try
             {
 
@@ -355,11 +351,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 chromeOptions.AddArgument("--disable-component-update");// ";
                 chromeOptions.AddArgument("--disable-desktop-notifications");
                 chromeOptions.AddArgument("--disable-translate");
-                chromeOptions.AddArgument("--enable-download-notification");
-
-
-          
-
+                chromeOptions.AddArgument("--enable-download-notification");         
 
                 /*
                  * В Chrome «Разрешить ограничения на загрузку» есть 4 варианта:
@@ -374,109 +366,28 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 chromeOptions.AddUserProfilePreference("download_restrictions" , 3);
                 
 
-
-                /*
-                 * driverOptions.AddUserProfilePreference("download.default_directory", BaseCommon._chromeDefaultDownloadsFolder);
-driverOptions.AddUserProfilePreference("intl.accept_languages", "nl");
-driverOptions.AddUserProfilePreference("profile.default_content_settings.popups", "0");
-driverOptions.AddUserProfilePreference("disable-popup-blocking", "true");
-var driverPath = System.IO.Directory.GetCurrentDirectory();
-Instance = new ChromeDriver(driverPath, driverOptions);
-                chromeOptions.AddUserProfilePreference("download.default_directory", Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
-chromeOptions.AddUserProfilePreference("download.prompt_for_download", false);
-chromeOptions.AddUserProfilePreference("disable-popup-blocking", "true");
-chromeOptions.AddUserProfilePreference("download.directory_upgrade", true);
-chromeOptions.AddUserProfilePreference("safebrowsing.enabled", true);
-                 */
-
-
-
-
-
-
-
-                //" \"$url\" & sleep ".($timeout * ($i + 1)).
-                //" && DISPLAY=:$DISP gm import -window root -crop 1260x965-0+60 -resize 300 $screen_path";
-
                 Browser = new OpenQA.Selenium.Chrome.ChromeDriver(chromeOptions);
 
                 //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
                 //к тайм ауту взаимодействия с драйвером. Исключаем такую ситуацию.
                 Browser.Manage().Timeouts().PageLoad=TimeSpan.FromSeconds(pageLoadTimeouts);
-                Browser.Manage().Timeouts().AsynchronousJavaScript=TimeSpan.FromSeconds(javaScriptTimeouts);
-
-          
-
-
-                //chromeOptions.AddArgument("---disable-gpu");
-                //chromeOptions.AddArgument("start-maximized"); // open Browser in maximized mode
-                //chromeOptions.AddArgument("disable-infobars"); // disabling infobars
-                // chromeOptions.AddArgument("--disable-extensions"); // disabling extensions
-                //chromeOptions.AddArgument("--no-sandbox");
-                //chromeOptions.AddArgument("--disable-setuid-sandbox");
-
-                //chromeOptions.AddArgument("--disable-dev-shm-using");
-                //chromeOptions.AddArgument("--disable-extensions");
-
-                //chromeOptions.AddArgument("start-maximized"); иначе ошибка
-                //chromeOptions.AddArgument("disable-infobars");
-                //chromeOptions.AddArgument("--user-data-dir");
-
-                // chromeOptions.AddArgument("--disable-gpu"); // applicable to windows os only
-                // chromeOptions.AddArgument("--disable-dev-shm-usage"); // overcome limited resource problems
-                // chromeOptions.AddArgument("--no-sandbox"); // Bypass OS security model
-                //chromeOptions.AddArgument("--remote-debugging-port=9222"); // Bypass OS security model
-
-                /*
-                 * System.setProperty("webdriver.chrome.driver", "C:\\path\\to\\chromedriver.exe");
-ChromeOptions options = new ChromeOptions();
-options.addArguments("start-maximized"); // open Browser in maximized mode
-options.addArguments("disable-infobars"); // disabling infobars
-options.addArguments("--disable-extensions"); // disabling extensions
-options.addArguments("--disable-gpu"); // applicable to windows os only
-options.addArguments("--disable-dev-shm-usage"); // overcome limited resource problems
-options.addArguments("--no-sandbox"); // Bypass OS security model
-WebDriver driver = new ChromeDriver(options);
-driver.get("https://google.com");
-                 */
-
-
-                //--disable-cache --disable-component-update --disable-desktop-notifications --disable-translate
-                //--disable-dev-shm-usage
-                // chromeOptions.AddArguments("window-size=1280,1060");
-
-
-                // chromeOptions.AddArgument("--log-level=1");
-                // chromeOptions.AddArgument("--enable-logging --v=1");
-
-
-                /*
-                 * Включение лога отладки ChromeDriverService, очень помогло! Не удаляй.
-                var service = ChromeDriverService.CreateDefaultService();
-                service.LogPath = "chromedriver.log";
-                service.EnableVerboseLogging = true;
-                Browser = new ChromeDriver(service);
-                */
+                Browser.Manage().Timeouts().AsynchronousJavaScript=TimeSpan.FromSeconds(javaScriptTimeouts);      
 
                 //Установка размера.
-                Browser.Manage().Window.Position = new System.Drawing.Point(0, 0); ;
-                //Browser.Manage().Window.Size = new Size(1024, 768);
-
-                //Работает но странно.
+                Browser.Manage().Window.Position = new System.Drawing.Point(0, 0); ;          
                 Browser.Manage().Window.Size = new System.Drawing.Size(1280, 1060);
-                //Browser.Manage().Window.FullScreen();// Maximize(); //Разворачиваем браузер на весь экран.
-                //Browser.Manage().Window.Minimize();
-                //Browser.Manage().Window.Size = new Size(480,320);
-                //logger.LogInformation(Browser.Manage().Window.Size.ToString());
+       
 
             }
             catch (Exception ex)
             {
-                //  MessageBox.Show(ex.Message);
                 //Исключение если не верная версия браузера.
-                throw new Exception("Exeption on metod runBrowser(user=" + Environment.UserName + "):" + ex.Message);
+                String msg = "Exeption on metod runBrowser(user=" + Environment.UserName + "):" + ex.Message;
+                Log.Error(msg);
+                return false;
             }
 
+            return true;
         }
 
 
@@ -512,7 +423,6 @@ driver.get("https://google.com");
 
             try
             {
-                //Browser.Manage().Window.Size = new Size(1280, 1060);
                 //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
                 Browser.Navigate().GoToUrl(url);
             }
@@ -528,41 +438,16 @@ driver.get("https://google.com");
 
             try
             {
-                /*
-            string bodyText =Browser.FindElement(By.TagName("body")).Text;
-            //Обработка ошибки 404.
-            if(bodyText.Contains("404"))
-            {
-                return "Error 404 in body:" + bodyText;
-            }
-            */
-
-
-                /*
-                bool wait = new WebDriverWait(Browser, TimeSpan.FromSeconds(60)).Until(d => ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").Equals("complete"));
-
-                if (wait == true)
-                {
-                    //Your code
-                }
-                */
-                // Thread.Sleep(2000);
-
-                /*
-                Screenshot ss = ((ITakesScreenshot)Browser).GetScreenshot();
-                ss.SaveAsFile("screen" + DateTime.Now.ToString("hh_mm_ss_fff") + ".jpg");
-                */
-                // Take Screenshot
-
+                /* 
+                 * Если потребуется обработка ошибок.
+                      string bodyText =Browser.FindElement(By.TagName("body")).Text;
+                     //Обработка ошибки 404.
+                         if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
+               */
+                //Создание скриншотта.
                 var screenshot = ((ITakesScreenshot)Browser).GetScreenshot();
 
-                // Build an Image out of the Screenshot
-                //Image screenshotImage;
-                //Image img = System.Drawing.Image.FromStream(myStream);
-
-
-                //screenshotImage = Image.FromStream(memStream);
-
+                //Обрезка.
                 using (var stream = new MemoryStream())
                 {
                     using var image = Image.Load(screenshot.AsByteArray);
@@ -577,17 +462,8 @@ driver.get("https://google.com");
                         .BackgroundColor(SixLabors.ImageSharp.Color.White));
 
 
-                    //var fileName = Path.GetFileName("screen" + DateTime.Now.ToString("hh_mm_ss_fff") + ".jpg");
-                    // var fileName = Path.GetFileName(filename);
-                    // var filePathFull = Path.Combine(curentDirectory, @"wwwroot/" + tmpDir, fileName);
                     string filePathFull = Path.Combine(curentDirectory,filePath);
-
-
                     image.Save(filePathFull, new JpegEncoder() { Quality = 85 });
-
-                    //  image.Save("screen" + DateTime.Now.ToString("hh_mm_ss_fff") + ".jpg",
-                    //        new JpegEncoder() { Quality = 85 });
-
 
                 }
             }catch(Exception ex)
@@ -601,20 +477,9 @@ driver.get("https://google.com");
 
         }
 
-        /*
-         * Для тестов.
-         *  String str1 = Path.Combine(Directory.GetCurrentDirectory(), "FullWhite.png");
-            String str2 = Path.Combine(Directory.GetCurrentDirectory(), "FullBlack.png");
-            String str3 = Path.Combine(Directory.GetCurrentDirectory(), "helloMan.jpg");
-
-            int y1 = imgOnlyBlackOrWhite(str1);
-            int y2 = imgOnlyBlackOrWhite(str2);
-            int y3 = imgOnlyBlackOrWhite(str3);
-            y1 = 10;
-         */
 
         /// <summary>
-        /// Проверет содержит ли картинка только черные или белые пиксели.
+        /// Проверяет содержит ли картинка только черные или белые пиксели.
         /// Т.е. рисунок полностью белый или полностью черный.
         /// Если только белые=1, если только черные=2, нет однотонных =0
         /// </summary>

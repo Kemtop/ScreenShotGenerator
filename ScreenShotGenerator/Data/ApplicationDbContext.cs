@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using ScreenShotGenerator.Entities;
-using ScreenShotGenerator.Services.ScreenShoterLogic;
+using ScreenShotGenerator.Services.ScreenShoterPools;
 using System;
 using System.Collections.Generic;
 using System.Linq;

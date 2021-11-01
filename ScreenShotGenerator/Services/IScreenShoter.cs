@@ -1,6 +1,6 @@
 ﻿using ScreenShotGenerator.Models;
 using ScreenShotGenerator.Services.Models;
-using ScreenShotGenerator.Services.ScreenShoterLogic;
+using ScreenShotGenerator.Services.ScreenShoterPools;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +9,9 @@ using System.Threading.Tasks;
 
 namespace ScreenShotGenerator.Services
 {
+    /// <summary>
+    /// Интерфейс логики скриншоттера.
+    /// </summary>
     public interface IScreenShoter
     {
         /// <summary>
@@ -17,9 +20,21 @@ namespace ScreenShotGenerator.Services
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
         void runService(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Отстанавливает сервис.
+        /// </summary>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         Task stopService(CancellationToken cancellationToken);
 
-        //Запуск процесса создания скринов.
+
+        /// <summary>
+        /// Добавляет запросы на создания скрин шоттов в пулл и ждет завершения зачач.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="userIP"></param>
+        /// <returns></returns>
         List<mUserJson> runJob(string[] url, string userIP);
 
         /// <summary>
@@ -29,13 +44,13 @@ namespace ScreenShotGenerator.Services
         SystemSettingModel getSettings();
 
         /// <summary>
-        /// Задает настройки сервиса.
+        /// Задает настройки сервиса и записывает их в БД.
         /// </summary>
         /// <returns></returns>
         void setSettings(SystemSettingModel m);
 
         /// <summary>
-        /// Перезапускает службу.
+        /// Перезапускает сервис.
         /// </summary>
         void restartService();
 
@@ -47,7 +62,7 @@ namespace ScreenShotGenerator.Services
         int getWaitTasksCnt();
 
         /// <summary>
-        /// Возвращает список задач у которых статус не новый.
+        /// Возвращает top последних задач в пуле задач у которых статус не новый.
         /// </summary>
         /// <param name="top"></param>
         /// <returns></returns>

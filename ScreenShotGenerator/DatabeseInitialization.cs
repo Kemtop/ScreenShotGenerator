@@ -17,12 +17,11 @@ namespace ScreenShotGenerator
     /// </summary>
     public static class DatabeseInitialization
     {
-        public  static async Task InitAsync(IServiceProvider scopeServiceProvider)
+        public  static void InitAsync(IServiceProvider scopeServiceProvider)
         {
             var context = scopeServiceProvider.GetService<ApplicationDbContext>();
             var userManager = scopeServiceProvider.GetService<UserManager<ApplicationUser>>();
          
-
             //Были ли добавлены в системе какие либо пользователи?
             var hasAny=context.Users.Take(1).ToList();
 

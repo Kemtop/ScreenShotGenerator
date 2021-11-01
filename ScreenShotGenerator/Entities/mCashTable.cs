@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace ScreenShotGenerator.Services.ScreenShoterLogic
+namespace ScreenShotGenerator.Entities
 {
     /// <summary>
     /// Модель таблицы Cash.

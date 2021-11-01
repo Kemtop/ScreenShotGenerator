@@ -1,14 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
-using OpenQA.Selenium;
 using ScreenShotGenerator.Services.BrowserControl;
-using ScreenShotGenerator.Services.ScreenShoterLogic;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
+using ScreenShotGenerator.Services.ScreenShoterPools;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -20,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ScreenShotGenerator.Entities;
 using Microsoft.Extensions.Configuration;
 using ScreenShotGenerator.Services.Models;
+using System.Diagnostics;
 
 namespace ScreenShotGenerator.Services
 {
@@ -30,6 +25,9 @@ namespace ScreenShotGenerator.Services
     /// <param name="message"></param>
      public delegate void saveBrowserError(int level,string message,string url,string filename);
 
+    /// <summary>
+    ///Логика скриншоттера.
+    /// </summary>
     public class ScreenShoter : IScreenShoter
     {
         private readonly IHttpContextAccessor _context;
@@ -41,7 +39,6 @@ namespace ScreenShotGenerator.Services
         //Блокировка кеши poolCache.
         static object lockCachePool = new object();
 
-
         //Директория для хранения временных файлов.
         const String tmpDir = "imgCache";
 
@@ -52,7 +49,11 @@ namespace ScreenShotGenerator.Services
         /// Пул задач.
         /// </summary>
         poolTasks poolTask;
-        int elementId = 0;//Ид элементов в списке. Идентификатор элемента для возможности его сортировки по возрастанию.
+
+        /// <summary>
+        /// Ид элементов в списке. Идентификатор элемента для возможности его сортировки по возрастанию
+        /// </summary>
+        int elementId = 0;
 
 
         /// <summary>
@@ -60,11 +61,8 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         cacheRam Cache;
 
-
         //Пул объектов для управления браузерами.
         List<IBrowserControl> poolBrowserControls;
-        //int poolBrowserSize = 4; //Количество запущенных браузеров.
-        //int browserTasksPerThread=5; //Количество задач из пула которые браузер обрабатывает за раз.
 
         int poolBrowserSize = 1; //Количество запущенных браузеров.
         int browserTasksPerThread = 5; //Количество задач из пула которые браузер обрабатывает за раз.
@@ -121,22 +119,20 @@ namespace ScreenShotGenerator.Services
         public ScreenShoter(
             IHttpContextAccessor context,
             IServiceScopeFactory scopeFactory,
-            IConfiguration configuration,
-            Action<ScreenShoter> action)
+            IConfiguration configuration)
         {
             _context = context;
             this.scopeFactory = scopeFactory;
 
             poolTask = new poolTasks();
-            poolTask.tmpDir = tmpDir; //Директория для хранения скриншотов.
-
+           
             Cache = new cacheRam();
             poolBrowserControls = new List<IBrowserControl>();
 
             //Чтение настроек сервиса.
             readSettingsFromDb();
 
-            //Выключает чтение кеши с базы данных.
+            //Выключает чтение кеши с базы данных. Использовать только для отладки.
             if (configuration["ScreenShoter:enableReadCacheFromDbInStart"] == "false")
             {
                 enableReadCacheFromDbInStart = false;
@@ -302,11 +298,14 @@ namespace ScreenShotGenerator.Services
                 {
                     IBrowserControl Bc = new ImpBrowserControlChrome();
                     Bc.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
-                    Bc.setTaskId(i + 1); //Ид браузера, что бы потоки как то можно отличать.
+                    Bc.browserId=i + 1; //Ид браузера, что бы потоки как то можно отличать.
                     Bc.setTimeouts(pageLoadTimeouts, javaScriptTimeouts); //Задаю таймауты загрузки.
-                    Bc.startBrowser();//Запустить браузер.
-                                      //Пока не понятно нужна ли тут задержка.
-                    Bc.processPool(ref poolTask, ref lockPoolTask, saveBrowserErrorDg); //Запустить обработку пула задач.
+
+                    if (!Bc.startBrowser())//Запустить браузер. Выходим если не смог.
+                        break;
+
+                    //Пока не понятно нужна ли тут задержка.
+                    Bc.processPool(ref poolTask, ref lockPoolTask, saveBrowserErrorDg, tmpDir); //Запустить обработку пула задач.
                     poolBrowserControls.Add(Bc);
                 }
                 catch (Exception ex)
@@ -330,7 +329,30 @@ namespace ScreenShotGenerator.Services
                 if (_cancellationToken.IsCancellationRequested) return;
             }
         }
-              
+
+
+        /// <summary>
+        /// Анализирует состояние пула, и возвращает модель ответа, если пул переполнен.
+        /// Иначе =null
+        /// </summary>
+        /// <returns></returns>
+        private mJobPool allowAcceptNewTasks(string url)
+        {
+            mJobPool task = null;
+            int cnt = poolTask.curentWaitElements(); //Количество ожидающих задач.
+            //Больше чем браузер обрабатывает за раз.
+            if (cnt > browserTasksPerThread)
+            {
+                task = new mJobPool();
+                task.id = -1;
+                task.url = url;
+                task.status =(int)enumTaskStatus.Error;
+                task.fileName = "Too many waiting tasks in pool. Now "+cnt.ToString();
+            }
+
+            return task;
+        }
+
         /// <summary>
         /// Добавляет задачу в пул задач и ждет ее завершения.
         /// </summary>
@@ -359,14 +381,19 @@ namespace ScreenShotGenerator.Services
                     t.url = url;
                     t.id = elementId; //Идентификатор элемента для возможности его сортировки.
 
-                    //Исключение ошибки переполнения. -10 просто так.
+                    //Исключение ошибки переполнения, если сервис будет очень долго работать. -10 просто так.
                     if (elementId == int.MaxValue - 10)
                         elementId = 0;//Обнуляю.
                     else
                         elementId++;
 
                     waitUnlockClearManPoolTask(); //Если осуществляется очистка пула-ждем.
-                    poolTask.add(t); //Добавляю задачу в пулл задач.
+                                                  //Не переполнен ли пул задач?
+                    mJobPool deny = allowAcceptNewTasks(url);
+                    if (deny == null)
+                        poolTask.add(t); //Добавляю задачу в пулл задач.
+                    else
+                        t = deny; //Сообщение об ошибке переполения пула.
 
                 }
                 else //Нашел выполненную.
@@ -381,33 +408,55 @@ namespace ScreenShotGenerator.Services
             int taskCnt = jb.Count; //Количество задач.
 
             int cntComplate = 0; //Количество выполненных задач.
-
+            var stopwatch = new Stopwatch();//Меряем сколько времени прошло.
+          
             //Жду пока браузеры не обработают задачи. Или не остановят процесс.
             while (!_cancellationToken.IsCancellationRequested)
             {
+                stopwatch.Start();
+
                 //Считаю количество выполненных задач или задач с ошибками.
                 cntComplate = 0;
                 foreach (mJobPool t in jb)
                 {
-                    if ((t.status == 3) || (t.status == 2)) cntComplate++;
+                    if ((t.status == (int)enumTaskStatus.End) || (t.status == (int)enumTaskStatus.Error))
+                        cntComplate++;
                 }
 
 
                 //Все задачи выполнены.
                 if (taskCnt == cntComplate)
                 {
-                    //Добавляет сведения о выполенных задачах в кеш.
-                    addToCash(ref jb);
-                    logErrors(ref jb, userIP);//Сохраняю сведени об ошибках.
-
-                    //Преобразовываю в пользовательский json.
-                    return createUserJson(ref jb);
-
+                    return generateAnswer(ref jb,userIP);
                 }
 
+                //Измеряем сколько обрабатываются задачи.
+                stopwatch.Stop();
+                double elipsed = stopwatch.Elapsed.TotalSeconds;
+                if(elipsed>50)
+                {
+                    return generateAnswer(ref jb, userIP);
+                }
             }
 
             return null;
+
+        }
+
+
+
+        /// <summary>
+        /// Выполняет пост обработку выполненных зачач, и формирует ответ.
+        /// </summary>
+        /// <returns></returns>
+        private List<mUserJson> generateAnswer(ref List<mJobPool> jb,string userIP)
+        {
+            //Добавляет сведения о выполенных задачах в кеш.
+            addToCash(ref jb);
+            logErrors(ref jb, userIP);//Сохраняю сведени об ошибках.
+
+            //Преобразовываю в пользовательский json.
+            return createUserJson(ref jb);
 
         }
 
@@ -421,8 +470,6 @@ namespace ScreenShotGenerator.Services
             {
                 var request = _context.HttpContext.Request;
                 hostName = request.Scheme + "://" + request.Host.Value;
-                poolTask.hostName = hostName; //Передаю значение другим потокам.
-                poolTask.tmpDir = tmpDir;//Директория в которой храняться картинки.
             }
 
         }
@@ -444,7 +491,7 @@ namespace ScreenShotGenerator.Services
 
 
                 //Если не было ошибок.
-                if (j.status == 3)
+                if (j.status == (int)enumTaskStatus.End)
                 {
                     String fullname = hostName + "/" + tmpDir + "/" + j.fileName;
                     userLine.path = fullname;
@@ -452,7 +499,7 @@ namespace ScreenShotGenerator.Services
                 }
 
                 //Возникла ошибка.
-                if (j.status == 2)
+                if (j.status == (int)enumTaskStatus.Error)
                 {
                     userLine.log = j.fileName;
                     userLine.status = 0;

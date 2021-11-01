@@ -1,20 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading.Tasks;
-using ImageMagick;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using ScreenShotGenerator.perfomenceService;
 using Serilog;
 using Serilog.Events;
-
-
-
 
 
 namespace ScreenShotGenerator
@@ -26,9 +16,8 @@ namespace ScreenShotGenerator
         {
             //Подключаю serilog.  
             Log.Logger = new LoggerConfiguration()
-           .MinimumLevel.Information()
-           .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-           .WriteTo.Console()
+           .MinimumLevel.Information() 
+           .MinimumLevel.Override("Microsoft", LogEventLevel.Warning) //Выводить только варнинги Microsoft.
            .WriteTo.File(      
                 @"./Logs/log.txt",
                 shared: true, //Доступен всем процессам.
@@ -41,9 +30,11 @@ namespace ScreenShotGenerator
             try
             {
                 Log.Information("[--------------------------Starting web host-----------------------------]");
+
                 var host = CreateHostBuilder(args).Build();
                 using (var scope = host.Services.CreateScope())
                 {
+                    //Первоначальная инициализация пользователей и значение настроек, если требуется.
                     DatabeseInitialization.InitAsync(scope.ServiceProvider);
                 }
 
@@ -58,11 +49,6 @@ namespace ScreenShotGenerator
             {
                 Log.CloseAndFlush();
             }
-
-
-            //https://stackoverflow.com/questions/41675577/where-can-i-log-an-asp-net-core-apps-start-stop-error-events
-            //host.WaitForShutdownAsync();
-           // System.Diagnostics.Debug.Write("Stop");
 
         }
 

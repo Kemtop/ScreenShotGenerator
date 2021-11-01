@@ -2,9 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 
-namespace ScreenShotGenerator.Services.ScreenShoterLogic
+
+namespace ScreenShotGenerator.Services.ScreenShoterPools
 {
     /// <summary>
     /// Кеш сервиса.

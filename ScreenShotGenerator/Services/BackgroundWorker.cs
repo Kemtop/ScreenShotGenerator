@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace ScreenShotGenerator
 {
     /// <summary>
-    /// Фоновая задача после запуска приложения.
+    /// Фоновая задача создания скриншотов.
     /// </summary>
     internal class BackgroundWorker : IHostedService
     {
@@ -29,15 +29,8 @@ namespace ScreenShotGenerator
             return Task.CompletedTask;
         }
 
-
-        /// <summary>
-        /// Не работает и похоже это баг Microsoft, ждем обновлений.
-        /// </summary>
-        /// <param name="cancellationToken"></param>
-        /// <returns></returns>
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            System.Diagnostics.Debug.Write("Stop");
              _screenShoter.stopService(cancellationToken);
             return Task.CompletedTask;
         }

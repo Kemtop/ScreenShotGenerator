@@ -1,5 +1,5 @@
 ﻿
-using ScreenShotGenerator.Services.ScreenShoterLogic;
+using ScreenShotGenerator.Services.ScreenShoterPools;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,11 +17,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Количество задач из пула которые браузер обрабатывает за раз.
         /// </summary>
         public int tasksPerThread { get; set; }
+
         /// <summary>
-        /// Задает идентификатор потока.
+        /// Идентификатор браузера.
         /// </summary>
-        /// <param name="id"></param>
-        void setTaskId(int id);
+        public int browserId { get; set; }
 
         /// <summary>
         /// Задает таймауты браузера.
@@ -35,12 +35,13 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Управляющий процесс запускает в отдельном потоке.
         /// </summary>
         /// <param name="poolTasks"></param>
-        void processPool(ref poolTasks pool,ref object locker,saveBrowserError saveBrowserErrorDg);
+        void processPool(ref poolTasks pool,ref object locker,saveBrowserError saveBrowserErrorDg, string tmpDir);
 
+   
         /// <summary>
         /// Запуск браузера.
         /// </summary>
-        void startBrowser();
+        bool startBrowser();
 
         /// <summary>
         ///Остановка браузера.

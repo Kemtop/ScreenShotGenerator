@@ -16,7 +16,7 @@ using ScreenShotGenerator.Models;
 using ScreenShotGenerator.Services;
 using ScreenShotGenerator.Services.BrowserControl;
 using ScreenShotGenerator.Services.Models;
-using ScreenShotGenerator.Services.ScreenShoterLogic;
+using ScreenShotGenerator.Services.ScreenShoterPools;
 
 namespace ScreenShotGenerator.Controllers
 {

@@ -4,21 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace ScreenShotGenerator.Services.ScreenShoterLogic
+namespace ScreenShotGenerator.Services.ScreenShoterPools
 {
     /// <summary>
     /// Пул задач.
     /// </summary>
     public class poolTasks
-    {
-        /// <summary>
-        /// Полное имя хоста с указаением порта.
-        /// </summary>
-        public string hostName { get; set; }
-        //Директория для хранения временных файлов скринов.
-        public String tmpDir { get; set; }
-
-
+    {      
         List<mJobPool> pool = new List<mJobPool>();
 
         //Добавить значение в пул.
@@ -43,8 +35,19 @@ namespace ScreenShotGenerator.Services.ScreenShoterLogic
         public int curentElementsInProcessCnt()
         {
             IEnumerable<mJobPool> ret = pool.Where(x => x.status == 1);
-            return ret.ToList().Count;
+            return ret.Count();
         }
+
+        /// <summary>
+        /// Количество ожидающих.
+        /// </summary>
+        /// <returns></returns>
+        public int curentWaitElements()
+        {
+            IEnumerable<mJobPool> ret = pool.Where(x => x.status == 0);
+            return ret.Count();
+        }
+
 
 
         /// <summary>

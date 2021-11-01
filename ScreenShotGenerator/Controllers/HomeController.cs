@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using ScreenShotGenerator.Models;
 using ScreenShotGenerator.Services;
-using ScreenShotGenerator.Services.ScreenShoterLogic;
+using ScreenShotGenerator.Services.ScreenShoterPools;
 
 namespace ScreenShotGenerator.Controllers
 {
