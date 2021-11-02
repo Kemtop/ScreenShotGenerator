@@ -12,8 +12,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
     {
         PostProcessingCheckError=-1, //Ошибки проверки файла скрин шота.
         GoUrl=1,
-        Debug=3, //Сообщения для долговременной отладки приложения. Браузер вернул пустой(null) заголовок.
         ProblemWithBrowser=2, //Критические ошибки с браузером.
+        Debug = 3, //Сообщения для долговременной отладки приложения. Браузер вернул пустой(null) заголовок.
+        GetScreenshotError =4
 
     }
 }

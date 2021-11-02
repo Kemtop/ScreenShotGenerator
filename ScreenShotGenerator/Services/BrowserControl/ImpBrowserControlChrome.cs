@@ -10,6 +10,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -192,7 +193,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                    
                     //Cоздание скриншота.
                    // Log.Information("take "+p.url+";Browser="+browserId.ToString());
-                    string err=takeScreenShot(p.url, filePath,p.fileName);
+                    string err=takeScreenShot(p.url, filePath,p.fileName,ref p.wastedTime);
                     //Log.Information("end " + p.url + ";Browser=" + browserId.ToString());
 
                     //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
@@ -398,7 +399,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        private string takeScreenShot(string url, string filePath,string filename)
+        private string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
         {
            
                 //Выполняю проверку живой ли браузер.
@@ -419,7 +420,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename); 
                     return "Error 701";
                 }
-                
+
+
+            //Измеряю затраченное время на открытие страницы.
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
 
             try
             {
@@ -432,21 +437,38 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
                 //Обработали исключение, сделали скрин шот, отправили пользователю.
             }
+        
+             //Замеряю истекшее время.
+                sw.Stop();
+                double elipsed = sw.Elapsed.TotalSeconds;
+                elipsedTime =(float) Math.Round(elipsed, 2);
+            /* 
+             * Если потребуется обработка ошибок.
+                  string bodyText =Browser.FindElement(By.TagName("body")).Text;
+                 //Обработка ошибки 404.
+                     if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
+           */
 
-              
+                 Screenshot screenshot = null;
+                try
+                {
+                    //Создание скриншотта.
+                    screenshot = ((ITakesScreenshot)Browser).GetScreenshot();
+                }
+               catch(Exception ex1)
+                {
+                    string str = "Exception to GetScreenshot: " + ex1.Message;
+                    String standartErrorImg = "noLoadPageErr.jpg";
+                    saveBrowserErrorDg((int)enumBrowserError.GetScreenshotError, str, url, filename);
+                      //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
+                    return copyFile(standartErrorImg, filename); ;
+                }
 
+
+            //driver.findElement(By.xpath("//a[@class='button allow']/span[text()='Allow cookies']")).click();
 
             try
             {
-                /* 
-                 * Если потребуется обработка ошибок.
-                      string bodyText =Browser.FindElement(By.TagName("body")).Text;
-                     //Обработка ошибки 404.
-                         if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
-               */
-                //Создание скриншотта.
-                var screenshot = ((ITakesScreenshot)Browser).GetScreenshot();
-
                 //Обрезка.
                 using (var stream = new MemoryStream())
                 {
@@ -465,10 +487,13 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     string filePathFull = Path.Combine(curentDirectory,filePath);
                     image.Save(filePathFull, new JpegEncoder() { Quality = 85 });
 
+
+
                 }
             }catch(Exception ex)
             {
-                String str= "Exception in metod takeScreenShot where create and save screenshot: " + ex.Message;
+                //Добавить стандартную картинку.
+                String str= "Exception in metod takeScreenShot where save screenshot: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename);
                 return "Error 702";
             }
@@ -477,6 +502,24 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
         }
 
+        /// <summary>
+        /// Копирует файл.
+        /// </summary>
+        private string copyFile(string src,string dst)
+        {
+            try
+            {
+                string filePath1 = Path.Combine("wwwroot/" + tmpDir, src);
+                string filePath2 = Path.Combine("wwwroot/" + tmpDir, dst);
+                File.Copy(filePath1, filePath2);
+            }
+            catch(Exception ex)
+            {
+                return "Error сopy file "+src+" to "+dst+". "+ex.Message;
+            }
+
+            return null;
+        }
 
         /// <summary>
         /// Проверяет содержит ли картинка только черные или белые пиксели.

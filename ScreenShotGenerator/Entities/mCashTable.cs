@@ -21,10 +21,18 @@ namespace ScreenShotGenerator.Entities
         /// </summary>
         public string fileName { get; set; }
 
-    /// <summary>
-    /// Временный отпечаток создания файла.
-    /// </summary>
-    public DateTime timestamp { get; set; }
+
+        /// <summary>
+        /// Время затраченное на создание скрин шотта.
+        /// </summary>
+        public float wastedTime { get; set; }
+
+        /// <summary>
+        /// Временный отпечаток создания файла.
+        /// </summary>
+        public DateTime timestamp { get; set; }
+
+
 
     }
 }

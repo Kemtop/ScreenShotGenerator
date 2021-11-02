@@ -35,5 +35,10 @@ namespace ScreenShotGenerator.Services.ScreenShoterPools
         /// Идентификатор браузера, который взялся выполнять задачу.
         /// </summary>
         public int browserId;
+
+        /// <summary>
+        /// Время затраченное на создание скрин шотта.
+        /// </summary>
+        public float wastedTime;
     }
 }

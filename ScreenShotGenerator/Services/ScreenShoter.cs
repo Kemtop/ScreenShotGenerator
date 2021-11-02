@@ -275,6 +275,9 @@ namespace ScreenShotGenerator.Services
                 i++;
             }
 
+            //Очищаю пулл.
+            poolBrowserControls.Clear();
+
             Log.Information("StopService.");
         }
 
@@ -581,6 +584,7 @@ namespace ScreenShotGenerator.Services
                         line.url = j.url;
                         line.timestamp = j.timestamp;
                         line.fileName = j.fileName;
+                        line.wastedTime = j.wastedTime;
 
                         db.screnshotCache.Add(line);
                         needSaveDb = true;
@@ -616,6 +620,7 @@ namespace ScreenShotGenerator.Services
                     l.fileName = ct.fileName;
                     l.timestamp = ct.timestamp;
                     l.url = ct.url;
+                    l.wastedTime = ct.wastedTime;
                     Cache.add(l);
                 }
             }

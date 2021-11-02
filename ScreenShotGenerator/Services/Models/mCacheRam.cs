@@ -24,5 +24,10 @@ namespace ScreenShotGenerator.Services.Models
         /// </summary>
         public DateTime timestamp;
 
+        /// <summary>
+        /// Время затраченное на создание скрин шотта.
+        /// </summary>
+        public float wastedTime;
+
     }
 }

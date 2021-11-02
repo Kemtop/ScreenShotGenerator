@@ -20,8 +20,8 @@ using ScreenShotGenerator.Services.ScreenShoterPools;
 
 namespace ScreenShotGenerator.Controllers
 {
-  //  [Authorize]
-  //  [Authorize(Roles = RolesConst.Admin)]
+    [Authorize]
+    [Authorize(Roles = RolesConst.Admin)]
     public class AdminController : Controller
     {
         //Для работы с базой данных.
@@ -444,6 +444,7 @@ namespace ScreenShotGenerator.Controllers
         /// Выход.
         /// </summary>
         /// <returns></returns>
+        [AllowAnonymous]
         public async Task<IActionResult> LogoutAsync()
         {
             await _signInManager.SignOutAsync();
