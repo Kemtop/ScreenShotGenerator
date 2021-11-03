@@ -2,6 +2,7 @@
 using ImageMagick;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Interactions;
 using ScreenShotGenerator.Services.Models;
 using ScreenShotGenerator.Services.ScreenShoterPools;
 using Serilog;
@@ -29,6 +30,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Объект для управления браузером(драйвер).
         /// </summary>
         private IWebDriver Browser;
+
+        /// <summary>
+        /// Действия браузера.
+        /// </summary>
+        private Actions actions;
 
         //Пул задач.
         private poolTasks poolTasks;
@@ -352,7 +358,25 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 chromeOptions.AddArgument("--disable-component-update");// ";
                 chromeOptions.AddArgument("--disable-desktop-notifications");
                 chromeOptions.AddArgument("--disable-translate");
-                chromeOptions.AddArgument("--enable-download-notification");         
+                chromeOptions.AddArgument("--enable-download-notification");
+                //Какое то хранилище браузера, описание так и не нашел.
+                chromeOptions.AddArgument("--disable-dev-shm-usage");
+                chromeOptions.AddArgument("--ignore-certificate-errors-spki-list");
+
+
+               // Для bluetoth ошибки "excludeSwitches", ["enable-logging"])
+
+                //Попытка исправить ошибку
+                /*
+                 * 
+                 * 	Exception to GoToUrl: timeout: Timed out receiving message from renderer: 
+                 * 	-31.468 (Session info: chrome=95.0.4638.69)
+                 */
+                //chromeOptions.AddArguments("no-sandbox");
+                //chromeOptions.AddArguments("--force-device-scale-factor=1");
+
+                //Предлагают disable-dev-shm-usage
+
 
                 /*
                  * В Chrome «Разрешить ограничения на загрузку» есть 4 варианта:
@@ -365,9 +389,32 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Отключить загрузку файлов.              
                 chromeOptions.AddArgument("--disable-infobars");
                 chromeOptions.AddUserProfilePreference("download_restrictions" , 3);
-                
+               // chromeOptions.AddArgument("--remote-debugging-port=0");
 
-                Browser = new OpenQA.Selenium.Chrome.ChromeDriver(chromeOptions);
+                //Включаем логирование, так как сыпяться ошибки.
+                var service = ChromeDriverService.CreateDefaultService();
+                service.LogPath = "chromedriver.log";
+                service.EnableVerboseLogging = true;
+
+
+                Browser = new OpenQA.Selenium.Chrome.ChromeDriver(service, chromeOptions, 
+                    TimeSpan.FromSeconds(pageLoadTimeouts)); //Время ожидания ответа от  WebDriverа.
+                                                             //Дабы исключить ошибку вида: The HTTP request to the remote WebDriver server for URL
+                                                             //http://localhost:38445/session/6fd13ff4c79b9ae2993d94f9c58499d0/url timed out after 60 seconds.
+
+
+                /*
+                 * Я изменил параметры методом проб и ошибок.
+
+chrome_options = Options()
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+chrome_options.add_argument('--disable-gpu')
+chrome_options.add_argument("--remote-debugging-port=9222")
+                 */
+
+
+                actions = new Actions(Browser);
 
                 //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
                 //к тайм ауту взаимодействия с драйвером. Исключаем такую ситуацию.
@@ -392,6 +439,25 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
 
+        int takeScreen = 0;
+        private void stopLoadPage()
+        {
+           
+            int max = pageLoadTimeouts * 100;
+            int cnt = 0;
+            while(takeScreen==0)
+            {
+                if (cnt > max) break;
+                Task.Delay(10);
+                cnt++;
+            }
+            if (takeScreen == 1) return;
+            actions.SendKeys(Keys.Escape);
+            Log.Information("stopLoadPage");
+        }
+
+
+        bool stop = false;
 
         /// <summary>
         /// Создает скрин шот, в случае ошибок возвращает строку.
@@ -401,30 +467,56 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <returns></returns>
         private string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
         {
+            if (stop)
+            {
+                Thread.Sleep(90000);
+
+                return "Err";
+            }
+
+
+            /*
+             *   Timer timerClearCache;
+             *   
+             *    timerClearComplatePoolTasks = new Timer((Object stateInfo) =>
+            {
+                ClearPoolTasks();
+            }, null, interval1, interval1);
+
+        
+          
            
-                //Выполняю проверку живой ли браузер.
-                try
-                {
-                     //Если с объектом что то не то-думаю должно высыпаться. Но как проверить пока не ясно.
-                    string ttl = Browser.Title;
+             */
 
-                    if(ttl==null)
-                    {
-                        saveBrowserErrorDg((int)enumBrowserError.Debug, "Warning! Browser title is null. May be crash?",url,filename);
-                    }
+            //Выполняю проверку живой ли браузер.
+            //Нормально не работает при тестах на виртуалке.
+            /*
+            try
+            {
+            //Если с объектом что то не то-думаю должно высыпаться. Но как проверить пока не ясно.
+            // string ttl = Browser.Title; Титл выбивает тайм аут 60сек.
+            string ttl = Browser.Url;
 
-                }
-                catch(Exception ex)
+            if (ttl==null)
                 {
-                    string str = "Exception to check title. Browser may be dead.: " + ex.Message;
-                    saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename); 
-                    return "Error 701";
+                    saveBrowserErrorDg((int)enumBrowserError.Debug, "Warning! Browser title is null. May be crash?",url,filename);
                 }
 
+            }
+            catch(Exception ex)
+            {
+                string str = "Exception to check title. Browser may be dead.: " + ex.Message;
+                saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename); 
+                return "Error 701";
+            }
+
+        */
 
             //Измеряю затраченное время на открытие страницы.
             Stopwatch sw = new Stopwatch();
             sw.Start();
+            takeScreen = 0;
+            Task ts = new Task(() => stopLoadPage());
 
             try
             {
@@ -436,6 +528,13 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 string str = "Exception to GoToUrl: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
                 //Обработали исключение, сделали скрин шот, отправили пользователю.
+
+                if(ex.Message.Contains("timed out after 60 seconds"))
+                {
+                    Thread.Sleep(90000);
+                    stop = true;
+                    return "Error";
+                }
             }
         
              //Замеряю истекшее время.
@@ -447,9 +546,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
                   string bodyText =Browser.FindElement(By.TagName("body")).Text;
                  //Обработка ошибки 404.
                      if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
+
+            Xvfb :1 -screen 0 1024x768x24 -extension RANDR &
            */
 
-                 Screenshot screenshot = null;
+            Screenshot screenshot = null;
                 try
                 {
                     //Создание скриншотта.
@@ -464,6 +565,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     return copyFile(standartErrorImg, filename); ;
                 }
 
+            takeScreen = 1;
 
             //driver.findElement(By.xpath("//a[@class='button allow']/span[text()='Allow cookies']")).click();
 
