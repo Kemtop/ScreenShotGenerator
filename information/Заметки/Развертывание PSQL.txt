@@ -1,0 +1,48 @@
+Создаем пользователя
+sudo -u postgres createuser --interactive 
+screenShotUser
+
+sudo -u postgres createuser --interactive --pwprompt
+
+screenShotUser1
+screenUser1
+296296
+--7k2m3zZZtiy
+
+
+Проверка пользователя.
+
+Replace the first two ident's with md5, like so:
+
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# "local" is for Unix domain socket connections only
+local   all             all                                     md5
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            md5
+# IPv6 local connections:
+host    all             all             ::1/128                 md5
+# Allow replication connections from localhost, by a user with the
+# replication privilege.
+#local   replication     postgres                                peer
+#host    replication     postgres        127.0.0.1/32            ident
+#host    replication     postgres        ::1/128                 ident
+Save file.
+
+Then, restart the server
+
+sudo systemctl restart postgresql
+
+Нужно заменить на md5
+
+ScreenShotServiceDb
+
+Написать скрипт для автоматической установки прав на папку и файлы в ней.
+
+ iptables -I INPUT 1 -m tcp -p tcp --dport 5432 -j ACCEPT 
+service iptables save 
+service iptables restart 
+
+
+firewall-cmd --permanent --add-port=5432/tcp
+firewall-cmd --reload

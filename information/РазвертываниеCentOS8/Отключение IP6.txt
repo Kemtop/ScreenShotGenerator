@@ -1,0 +1,14 @@
+Сначала создайте новый файл конфигурации sysctl:  
+/etc/sysctl.d/70-ipv6.conf, используя следующую команду:
+
+# nano /etc/sysctl.d/70-ipv6.conf
+
+Затем добавьте следующие строки и сохраните файл
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+Теперь, чтобы отключить IPv6, используйте следующую команду:
+
+sysctl --load /etc/sysctl.d/70-ipv6.conf
+
+Чтобы проверить, отключен ли IPv6, выполните следующую команду ip:
+# ip a | grep inet6

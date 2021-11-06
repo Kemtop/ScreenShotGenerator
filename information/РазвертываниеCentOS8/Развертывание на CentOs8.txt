@@ -1,0 +1,233 @@
+  Действия выполняются от root.
+1. Установка среды выполнения.
+dnf install aspnetcore-runtime-5.0
+
+
+Настройка синхронизации времени:
+Установка сервера
+В CentOS 8 пакетом для синхронизации времени является chrony — он пришел на смену ntpd.
+Устанавливаем его командой:
+
+dnf install chrony
+
+Разрешаем автозапуск и стартуем сервис:
+
+systemctl enable chronyd --now
+
+
+2. Добавить пользователя screenShotService.
+useradd screenShotService
+
+3.Создать каталог site в домашнем катологе screenShotService, назначить владельца и группу screenShotService.
+Используем файл менеджер mc. F9->File->Chown. 
+chown -R screenShotService:screenShotService /home/screenShotService/site
+
+
+4.Ставим виртуальный кадровый буфер,так как на сервере нет видеокарты.
+   dnf install Xvfb
+Копируем файл Xvfb.service (можно использовать программу WinSCP) в:
+ /etc/systemd/system/Xvfb.service
+Пробуем запустить:
+ systemctl start Xvfb
+Проверяем его работоспособность.
+ ps -ef | grep Xvfb
+Должны получить следующее. 
+nobody     20562       1  0 10:26 ?        00:00:00 /usr/bin/Xvfb :1 -screen 0 1920x1080x24+32 +extension GLX +render
+Включаем автоматическую загрузку Xvfb:
+systemctl enable Xvfb
+
+5.Для работы браузера нужна alsa-lib, иначе при открытии некоторых сайтов
+https://www.asus.com/ru/Motherboards/M5A78L-M-PLUS-USB3/
+https://www.timeanddate.com/stopwatch/
+https://www.eldorado.ru/cat/detail/noutbuk-asus-f540ub-gq1225t/
+http://fanserials.cheap/the-witcher/
+https://www.e1.ru/text/longread/2019/12/23/66413287/
+браузер будет выдавать ошибку связи с драйвером.
+	Exception to GoToUrl: The HTTP request to the remote WebDriver server for
+	URL http://localhost:36365/session/0b007879fdf968292d66bc65dea931b4/url
+	timed out after 60 seconds.
+Судя по всему на данных сайта есть компоненты для воспроизведения музыки,
+в логах драйвера можно увидеть:
+ALSA lib confmisc.c:768:(parse_card) cannot find card '0'  и т.д.
+устанавливаем пакет:
+dnf install alsa-lib
+--alsa-lib-1.2.5-4.el8.x86_64 был установлен.
+alsa-sof-firmware-1.8-1.el8.noarch
+и не только
+
+--------------
+Смотрим список:
+rpm -qa | sort
+dnf install xorg-x11-font-utils
+
+
+
+4. Установка браузера Chrome.
+Перейдите в домашнюю папку. Скачайте пакет установщика:
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
+Устанавливаем:
+ yum localinstall google-chrome-stable_current_x86_64.rpm
+Проверяем версию: 
+google-chrome --version
+Google Chrome 94.0.4606.81
+На момент написания инструкции была:
+Google Chrome 95.0.4638.69
+
+Проверяем работоспособность браузера.От root запускать нельзя!
+su screenShotService
+google-chrome
+у меня выдало ошибку
+[1102/103910.364104:ERROR:file_io_posix.cc(144)] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq: No such file or directory (2)
+[1102/103910.364157:ERROR:file_io_posix.cc(144)] open /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq: No such file or directory (2)
+
+5. Установка сервера БД.
+В первую очередь просмотрите список доступных потоков для модуля postgresql с помощью команды dnf:
+dnf module list postgresql
+Чтобы активировать поток модуля для Postgres версии 12, запустите следующую команду:
+dnf module enable postgresql:12
+Чтобы активировать поток модуля версии 12, вы можете установить пакет postgresql-server 
+для установки PostgreSQL 12 и всех зависимостей:
+dnf install postgresql-server 
+При появлении запроса подтвердите установку, нажав y, а затем ENTER.
+Создание нового кластера баз данных PostgreSQL.
+Пакет Postgres, установленный на предыдущем шаге, содержит удобный скрипт с 
+именем postgresql-setup, который помогает администрированию кластеров баз данных на низком уровне.
+ Для создания кластера баз данных запустите скрипт с помощью sudo и опции --initdb:
+postgresql-setup --initdb
+Теперь запустите службу PostgreSQL с помощью systemctl:
+systemctl start postgresql
+Затем воспользуйтесь systemctl еще раз, чтобы активировать запуск службы при загрузке сервера:
+systemctl enable postgresql
+PostgreSQL использует концепцию ролей для выполнения аутентификации и авторизации клиента.
+ В некоторых аспектах они напоминают обычные учетные записи в Unix, однако Postgres не делает 
+ различий между пользователями и группами и предпочитает использовать более гибкий термин — роль.
+После установки Postgres настроена на использование аутентификации ident, что значит, что выполняется
+ привязка ролей Postgres с соответствующей системной учетной записью Unix/Linux. Если роль существует
+ внутри Postgres, пользователь Unix/Linux с тем же именем может выполнить вход в качестве этой роли.
+Задаем пароль пользователю postgres:
+
+sudo -u postgres psql
+ALTER USER postgres PASSWORD '20032003zTmfrD507';
+# для мойей локальной виртуалки.
+ALTER USER postgres PASSWORD '12345678';
+
+В случае успеха Postgres выдаст подтверждение, "ALTER ROLE".
+Выходим:
+\q
+
+7.Развертываем Web приложение.
+Копируем файлы в папку /home/screenShotService/site
+Назначаем владельца и группу всем файлам:
+chown -R screenShotService:screenShotService /home/screenShotService/site
+Скачиваем требуемую версию драйвера для управления браузером:
+google-chrome --version
+Google Chrome 95.0.4638.69
+Скачиваем с https://chromedriver.chromium.org/downloads
+Разархивируем, копируем файл chromedriver в  /home/screenShotService/site
+Даем права на исполнение:
+chmod +x chromedriver
+
+Копируем файл запуска сервиса screenShotService.service из папки files в:
+/etc/systemd/system/screenShotService.service
+
+После первого запуска, приложение создает свою базу данных и структуру
+таблиц в ней. Поэтому нужны права суперпользователя.
+Изменим строку подключения в файле appsettings.json:
+    "Username": "postgres",
+    "Password": "20032003zTmfrD507"
+	
+По умолчанию в postgres включена ident аутентификация, 
+что не позволит приложению подключится к БД.
+Изменим файл /var/lib/psql/pg_hba.conf
+Установим авторизацию scram-sha-256 вместо peer и ident.
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# "local" is for Unix domain socket connections only
+local   all             all                                     md5
+# IPv4 local connections:
+host    all             all             127.0.0.1/32           	md5 
+# IPv6 local connections:
+host    all             all             ::1/128                 md5
+# Allow replication connections from localhost, by a user with the
+# replication privilege.
+#local   replication     postgres                                peer
+#host    replication     postgres        127.0.0.1/32            ident
+#host    replication     postgres        ::1/128                 ident	
+Перезапускаем сервер:
+systemctl restart postgresql
+
+Запускаем сервис.
+systemctl start screenShotService	
+Идем в /Log смотрим сообщения.
+
+Открываем порт для внешнего мира.
+firewall-cmd --add-port=5000/tcp --permanent
+firewall-cmd --reload
+	
+Команды не обрабатываются получаем ошибку:
+bash firewall-cmd command not found
+
+Проверяем http://46.254.21.204:5000/
+и у нас все работает.
+
+Видимо фаер волла или нет или порт открыт.
+		
+Для работы через https нужно получить бесплатный сертификат на 90 дней.		
+https://zerossl-com.translate.goog/?_x_tr_sl=en&_x_tr_tl=ru&_x_tr_hl=ru&_x_tr_pto=nui		
+DimonParol77 пароль дня него.
+Инструкция https://dylanbeattie.net/2020/11/18/using-https-with-kestrel.html
+Вводим
+openssl pkcs12 -export -out certificate.pfx -inkey private.key -in certificate.crt
+Вам будет предложено ввести пароль для экспорта - если вы используете его для чего-либо, даже отдаленно важного, 
+рекомендуется указать здесь безопасный пароль.
+Если вы оставите поле пароля экспорта пустым, любой, кто получит файл .PFX, сможет выдать себя за вас.
+Не проверяйте свой PFX-файл в Github и не публикуйте его где-либо в Интернете.
+Exportпароль:123456Kz
+Появиться файл certificate.pfx
+После того, как вы экспортировали сертификат как certificate.pfx,
+нам нужно указать веб-серверу Kestrel использовать его.
+Открываем порт.
+firewall-cmd --add-port=5001/tcp --permanent
+firewall-cmd --reload
+
+		
+8. Проверьте правильность системного времени:
+date
+
+
+9.Запуск теста.
+Создаем пользователя
+useradd -p password -s /bin/bash Tom
+passwd Tom
+Вводи пароль 123456
+
+chown -R Tom:Tom /home/Tom/Test
+
+
+Если требуется разрешение удаленного подключеие к БД. Открываем
+/var/lib/psql/postgresql.conf
+раскоментируем и меняем listen_addresses = '*'
+перезапускаем сервер.
+systemctl restart postgresql
+
+firewall-cmd --permanent --add-port=5432/tcp
+firewall-cmd --reload
+
+Если требуется удаление БД.
+sudo -u postgres psql
+DROP DATABASE "ScreenShotServiceDb";
+\q
+
+
+4. Скопировать файл запуска сервиса screenShotService.service из папки files в:
+/etc/systemd/system/screenShotService.service
+
+
+
+Найти установленный пакет: rpm -qa | sort
+Найти процесс ps aux | grep -i dbus
+
+Скрипт запуска dbus
+/usr/lib/systemd/user/dbus.service
+
+org-freedesktop.DBus

@@ -1,0 +1,42 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "PgSqlConnectionStrings": {
+    "Host": "localhost",
+    "Port": "5432",
+    "Database": "ScreenShotServiceDb",
+    "Username": "postgres",
+    "Password": "926926"
+  },
+  "Authentication": {
+    "Facebook": {
+      "AppId": "568282444453471",
+      "AppSecret": "8b6dddfc49d7c83b8d9ea47b23595673"
+    }
+
+  },
+  "perfomanceService": {
+    "intervalMonitoring": "10" -интервал получения данных о производительности в секундах.
+	"periodClearData": 31 -интервал очистки данных в таблице в cутках.
+	"runCheckOldDataAfter": 300 в минутах. запустить проверку наличия устаревших данных после x минут после запуска. И проверять с таким же интервалом.
+  },
+  "ScreenShoter": {
+    "enableReadCacheFromDbInStart": "true", -считывать кеш из базы данных. Иначе повторно будет обрабатывать и пытаться ее туда засунуть.
+	Кешь считывается в память для ускорения работы. Занемает очень мало места.
+	
+    "ClearComplatePoolTasks": "10", -интервал с которым удаляются обработанные записи из пула задач. Пул находиться в памяти.
+	Во время очистки пула доступ к нему другим процессам(браузерам) блокируется.
+	
+    "intervalCheckNeedClearCash": "100"-в минутах,интервал запуска планировщика проверки необходимости чистки кеш скриншотов. В памяти
+	и на диске.
+	Если есть устаревший записи, ресурс блокируется и удаляются данные.
+	
+	"CheckNeedClearCashAfterStartup": "60"- минут, время запуска задачи очистки кеша после запуска приложения.
+  },
+  "AllowedHosts": "*"
+}

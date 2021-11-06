@@ -1,0 +1,22 @@
+A quick fix:
+In certain cases the yum update have to be done immediately, in such cases, we can go for a temporary fix. One of our customers contacted us with the following error message. He received it while updating the CentOS 7 using yum update command.
+
+The SSL certificate failed verification
+Initially, we removed cached packages and headers using the following command:
+
+yum clean all
+Then as a quick fix, we disabled sslverify in the configuration file /etc/yum.conf
+
+sslverify=false
+Since the parameter has not been taken into account by the plugin yum-rhn-plugin. Then we disabled the plugin yum-rhn-plugin by editing in the configuration file using the command
+
+vim /etc/yum/pluginconf.d/rhnplugin.conf
+Within this file, we changed
+
+enabled=1
+to
+
+enabled=0
+After editing and saving this file we were able to update yum correctly. This is actually a temporary fix in which the certificate’s verification was disabled.
+
+Add “sslverify=false” in the ‘/etc/yum.conf’ file to solve this.

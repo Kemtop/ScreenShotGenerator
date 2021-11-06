@@ -1,0 +1,7 @@
+Exception to GetScreenshot: The HTTP request to the remote WebDriver server for URL http://localhost:36375/session/2cda642e77ae45e9987a8f10bcdab868/screenshot
+ timed out after 8 seconds.
+ 
+ Exception in metod takeScreenShot where save screenshot:
+ Object reference not set to an instance of an object.
+ 
+Exception in metod takeScreenShot where save screenshot: Object reference not set to an instance of an object.

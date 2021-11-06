@@ -1,0 +1,80 @@
+
+
+                /*
+                 * driverOptions.AddUserProfilePreference("download.default_directory", BaseCommon._chromeDefaultDownloadsFolder);
+driverOptions.AddUserProfilePreference("intl.accept_languages", "nl");
+driverOptions.AddUserProfilePreference("profile.default_content_settings.popups", "0");
+driverOptions.AddUserProfilePreference("disable-popup-blocking", "true");
+var driverPath = System.IO.Directory.GetCurrentDirectory();
+Instance = new ChromeDriver(driverPath, driverOptions);
+                chromeOptions.AddUserProfilePreference("download.default_directory", Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+chromeOptions.AddUserProfilePreference("download.prompt_for_download", false);
+chromeOptions.AddUserProfilePreference("disable-popup-blocking", "true");
+chromeOptions.AddUserProfilePreference("download.directory_upgrade", true);
+chromeOptions.AddUserProfilePreference("safebrowsing.enabled", true);
+                 */
+				 
+				                 //" \"$url\" & sleep ".($timeout * ($i + 1)).
+                //" && DISPLAY=:$DISP gm import -window root -crop 1260x965-0+60 -resize 300 $screen_path";
+				
+				
+                //chromeOptions.AddArgument("---disable-gpu");
+                //chromeOptions.AddArgument("start-maximized"); // open Browser in maximized mode
+                //chromeOptions.AddArgument("disable-infobars"); // disabling infobars
+                // chromeOptions.AddArgument("--disable-extensions"); // disabling extensions
+                //chromeOptions.AddArgument("--no-sandbox");
+                //chromeOptions.AddArgument("--disable-setuid-sandbox");
+
+                //chromeOptions.AddArgument("--disable-dev-shm-using");
+                //chromeOptions.AddArgument("--disable-extensions");
+
+                //chromeOptions.AddArgument("start-maximized"); иначе ошибка
+                //chromeOptions.AddArgument("disable-infobars");
+                //chromeOptions.AddArgument("--user-data-dir");
+
+                // chromeOptions.AddArgument("--disable-gpu"); // applicable to windows os only
+                // chromeOptions.AddArgument("--disable-dev-shm-usage"); // overcome limited resource problems
+                // chromeOptions.AddArgument("--no-sandbox"); // Bypass OS security model
+                //chromeOptions.AddArgument("--remote-debugging-port=9222"); // Bypass OS security model
+
+                /*
+                 * System.setProperty("webdriver.chrome.driver", "C:\\path\\to\\chromedriver.exe");
+ChromeOptions options = new ChromeOptions();
+options.addArguments("start-maximized"); // open Browser in maximized mode
+options.addArguments("disable-infobars"); // disabling infobars
+options.addArguments("--disable-extensions"); // disabling extensions
+options.addArguments("--disable-gpu"); // applicable to windows os only
+options.addArguments("--disable-dev-shm-usage"); // overcome limited resource problems
+options.addArguments("--no-sandbox"); // Bypass OS security model
+WebDriver driver = new ChromeDriver(options);
+driver.get("https://google.com");
+                 */
+
+
+                //--disable-cache --disable-component-update --disable-desktop-notifications --disable-translate
+                //--disable-dev-shm-usage
+                // chromeOptions.AddArguments("window-size=1280,1060");
+
+
+                // chromeOptions.AddArgument("--log-level=1");
+                // chromeOptions.AddArgument("--enable-logging --v=1");
+
+
+                /*
+                 * Включение лога отладки ChromeDriverService, очень помогло! Не удаляй.
+                var service = ChromeDriverService.CreateDefaultService();
+                service.LogPath = "chromedriver.log";
+                service.EnableVerboseLogging = true;
+                Browser = new ChromeDriver(service);
+                */
+				
+				
+				     //Browser.Manage().Window.Size = new Size(1024, 768);
+					          //Browser.Manage().Window.FullScreen();// Maximize(); //Разворачиваем браузер на весь экран.
+                //Browser.Manage().Window.Minimize();
+                //Browser.Manage().Window.Size = new Size(480,320);
+                //logger.LogInformation(Browser.Manage().Window.Size.ToString());
+				
+				                //Browser.Manage().Window.Size = new Size(1280, 1060);
+
+--enable-file-cookies

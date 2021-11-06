@@ -1,0 +1,137 @@
+Как сделать отображение Xvfb видимым?
+Спросил 9 года, 2 месяца назад
+Последняя активность 1 год 8 месяцев назад
+Просмотрен 64k раз
+
+38
+
+
+21 год
+Я запускаю селен через Xvfb на дисплее с номером 99 следующим образом:
+
+/ usr / bin / Xvfb: 99 -ac -screen 0 1024x768x8 & export DISPLAY = ": 99" && java -jar /usr/lib/selenium/selenium-server-standalone-2.24.1.jar -port 4444
+
+Однако дисплей с номером, отличным от: 0, по умолчанию не отображается. Как сделать его видимым, чтобы увидеть, что селен делает в браузере?
+
+
+Используйте X11vnc
+Все, что вам нужно, это установить x11vncчерез:
+sudo apt-get install x11vnc xvfb fluxbox
+Но на сент ос этого всего нет!.
+
+Запуск x11vncв оболочке
+Затем, чтобы настроить доступ к Xvfb для удаленного управления, вы можете использовать X11 через SSH или VNC через SSH, например
+
+export DISPLAY=:1
+Xvfb $DISPLAY -screen 0 1024x768x16 &
+fluxbox &
+x11vnc -display $DISPLAY -bg -forever -nopw -quiet -listen localhost -xkb
+Запустить x11vncс помощью скрипта
+Вот версия, удобная для скриптов Xvfb, x11vncи fluxbox:
+
+export DISPLAY=${DISPLAY:-:0} # Select screen 0 by default.
+xdpyinfo
+if which x11vnc &>/dev/null; then
+  ! pgrep -a x11vnc && x11vnc -bg -forever -nopw -quiet -display WAIT$DISPLAY &
+fi
+! pgrep -a Xvfb && Xvfb $DISPLAY -screen 0 1024x768x16 &
+sleep 1
+if which fluxbox &>/dev/null; then
+  ! pgrep -a fluxbox && fluxbox 2>/dev/null &
+fi
+echo "IP: $(hostname -I) ($(hostname))"
+Примечание: я использую его в следующем проекте Docker (проверьте .funcs.cmds.inc.sh).
+
+Запускать x11vncс однострочным письмом
+Или вы можете использовать следующий однострочник:
+
+$ x11vnc -create -env FD_PROG=/usr/bin/fluxbox \
+    -env X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 \
+        -env X11VNC_CREATE_GEOM=${1:-1024x768x16} \
+        -gone 'killall Xvfb' \
+        -bg -nopw
+-create заставляет запускать Xvfb
+X11VNC_FINDDISPLAY_ALWAYS_FAILS=1заставляет его перейти к созданному сеансу Xvfb (отображать :1вместо :0обычного рабочего стола)
+FD_PROG=/usr/bin/fluxbox заставляет его запускать Fluxbox (один из Ubuntu, должен иметь фоновый логотип Ubuntu)
+X11VNC_CREATE_GEOM=${1:-1024x768x16} устанавливает 16-битный цвет экрана 1024x768
+-goneубирается при выходе, иначе Xvfb останется позади (убийство xvfbтакже убивает fluxbox)
+
+--------------------------------------------------------
+
+
+We can install TigerVNC from the official Fedora repository with the command:
+$ sudo dnf  install tigervnc-server -y
+
+Step 2. Configure firewall to allow the VNC service to run:
+sudo firewall-cmd --add-service=vnc-server --permanent
+sudo firewall-cmd --reload
+
+Step 3. Add a new user whose session will be shared with remote clients.
+sudo useradd myvnc
+sudo passwd myvnc
+пароль 12345678K
+
+
+Шаг 4. Затем войдите в систему для созданного выше пользователя и создайте пароль для сеанса vnc.
+ Этот пароль будет использоваться для аутентификации любого пользователя, 
+пытающегося подключиться к вашему серверу VNC. Для этого выполните следующие действия:
+
+su - myvnc
+$ vncpasswd
+пароль 12345678K
+ Хотите ввести пароль только для просмотра (да / нет)? n [введите здесь 'n']
+ 
+ ПРИМЕЧАНИЕ. Пароль пользователя vnc не зашифрован, это обычный текстовый пароль.
+ Starting VNC Server
+Step 1. We are all set to start the VNC server. Switch to the VNC user, 
+myvnc in our case, and run the following command:
+ 
+ vncserver :1 -geometry 1600x1200
+  ps -ef | grep Xvfb
+ 
+ Остановка сеанса VNC
+Сеанс vnc можно легко остановить. Просто запустите приведенную ниже команду от пользователя VNC (в нашем случае myvnc):
+
+$ su - myvnc
+
+vncserver :1 -geometry 1600x1200
+$ vncserver -kill :1
+
+Порт подключения 5901.
+find / -name "x-terminal-emulator"
+
+На :99  не работает!!! 
+ 
+yum  install  xterm 
+---------Настройка запуска селениума
+So our steps now — still on Debian — would be:
+install TightVNC (xterm is optional but convenient):
+sudo apt-get install tightvncserver xterm
+
+2. make a “~/.vnc” folder and a “~/.vnc/xstartup” file containing:
+
+#!/bin/sh
+[ -x /etc/vnc/xstartup ] && exec /etc/vnc/xstartup
+[ -r $HOME/.Xresources ] && xrdb $HOME/.Xresources
+xsetroot -solid grey
+export DISPLAY=:99
+java -jar /opt/selenium-server-standalone.jar &
+x-terminal-emulator -ls -title “$VNCDESKTOP Desktop” &
+
+3. make sure it is executable:
+chmod +x ~/.vnc/xstartup
+
+
+Если сценарий TigerVNC работает, просто скопируйте ~ / .vnc / xstartup в ~ / .vnc / xstartup.turbovnc и отредактируйте сценарий по своему вкусу. Сценарий TigerVNC более простой, чем наш, но оба сценария пытаются запустить оконный менеджер системы, прежде чем вернуться к TWM. Если TWM приемлем в качестве оконного менеджера, вы можете просто отредактировать ~ / .vnc / xstartup.turbovnc следующим образом:
+
+#!/bin/sh
+
+if [ -f $HOME/.Xresources ]; then xrdb $HOME/.Xresources; fi
+xsetroot -solid grey
+xterm -geometry 80x24+10+10 -ls -title "$VNCDESKTOP Desktop" &
+twm &
+{your application goes here}
+
+
+https://medium.com/code-enigma/using-vnc-as-the-display-manager-to-run-selenium-tests-e4f817137ce2
+https://linuxhint.com/configure-vnc-server-in-fedora-linux/

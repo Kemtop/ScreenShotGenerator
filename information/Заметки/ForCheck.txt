@@ -1,0 +1,40 @@
+?url[0]=https://google.ru&url[1]=https://google.com&url[2]=https://yandex.com&allowedReferer=1
+
+?url[0]=https://google.ru&allowedReferer=1&useEncoding
+?url[0]=https://mail.ru&allowedReferer=1
+
+Не существующий урл
+.
+?url[0]=https://goo111uogle.ru&allowedReferer=1
+
+?url[0]=https://google.ru&url[1]=https://google.com&url[2]=https://yandex.com&url[3]=https://mail.ru&allowedReferer=1
+
+
+https://localhost:44350/?url[0]=https://mailingow.ru&allowedReferer=1
+
+https://localhost:44350/?url[0]=https://yandex.ru/efir?reqid=1601258222163493-1567824238974650899600269-prestable-app-host-sas-web-yp-197&url[1]=https://fanfics.me/favorite?action=subscribed_fics&url[2]=http://undergroundmarket.ru/product/kraska-eternal-marshall-bennett-gray-wash-set-8&url[3]=https://www.youtube.com/watch?v=g_totlcMiu4&url[4]=http://120.su/&url[5]=http://artfile.ru/s.php?s=32&url[6]=https://www.youtube.com/watch?v=YFdL8XD22Bc&url[7]=https://www.livemaster.ru/marystones2/policy&url[8]=https://www.youtube.com/watch?v=8lksP_-OMRg&t=12s&url[9]=https://sharewood.biz/search/1738969/?q=Сергей+Копыленко&o=relevance&allowedReferer=1
+
+
+?url[0]=https://google.ru&allowedReferer=1&useEncoding=1
+
+Сайты вечно загружатели.
+?url[0]=http://artfile.ru/s.php?s=32&allowedReferer=1
+?url[0]=http://xxx.artfile.ru/s.php?s=34&allowedReferer=1 --тут явно видно.
+?url[0]=https://bitkoin-i-ne-tolko.webnode.ru/&allowedReferer=1
+
+
+?url[0]=https://download.cdn.viber.com/desktop/windows/ViberSetup.exe&allowedReferer=1
+
+?url[0]=https://go.skype.com/windows.desktop.download&allowedReferer=1
+
+
+?url[0]=https://google.ru&allowedReferer=1
+
+?url[0]=https://mail.ru&allowedReferer=1
+?url[0]=https://docs.microsoft.com/&allowedReferer=1
+
+
+?url[0]=https://linkbuilder.su/&allowedReferer=1
+
+?url[0]=https://www.timeanddate.com/stopwatch/&allowedReferer=1
+?url[0]=https://www.asus.com/ru/Motherboards/M5A78L-M-PLUS-USB3/&allowedReferer=1

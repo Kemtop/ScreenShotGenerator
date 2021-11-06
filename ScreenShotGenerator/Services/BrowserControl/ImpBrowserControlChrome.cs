@@ -53,7 +53,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Задача выборки данных из пула и их обработки.
         /// </summary>
         // private Task workTask;
-        private Thread workThread;
+        //private Thread workThread;
+        private Task workThread;
 
         /// <summary>
         /// Делегат для сохранения сведений об ошибках браузера.
@@ -107,9 +108,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             threadIsRun = true; //Задача может работать.
                                 //Запускаю задачу.
-                                // workTask = new Task(processPoolThread);
+            workThread = new Task(processPoolThread);
                                 // workTask.Start();
-            workThread = new Thread(processPoolThread);
+            //workThread = new Thread(processPoolThread);
             workThread.Start();
         }
 
@@ -130,8 +131,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
             threadIsRun = false; //Остановка процесса обработки задач, если запущен.
             Browser.Quit();
             //Ждем завершения потока.
-            workThread.Join();
+            //workThread.Join();
             //Task.WaitAny(workTask);
+            Task.WaitAny(workThread);
         }
 
 
@@ -362,9 +364,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Какое то хранилище браузера, описание так и не нашел.
                 chromeOptions.AddArgument("--disable-dev-shm-usage");
                 chromeOptions.AddArgument("--ignore-certificate-errors-spki-list");
+                chromeOptions.AddArgument("--remote-debugging-port=9222");
+               // chromeOptions.AddArgument("no-sandbox");
+                chromeOptions.AddArgument("--mute-audio");
+                chromeOptions.AddArgument("--ignore-certificate-errors");
 
-
-               // Для bluetoth ошибки "excludeSwitches", ["enable-logging"])
+                // Для bluetoth ошибки "excludeSwitches", ["enable-logging"])
 
                 //Попытка исправить ошибку
                 /*
@@ -376,6 +381,17 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //chromeOptions.AddArguments("--force-device-scale-factor=1");
 
                 //Предлагают disable-dev-shm-usage
+
+                /*
+           * Я изменил параметры методом проб и ошибок.
+
+chrome_options = Options()
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+chrome_options.add_argument('--disable-gpu')
+chrome_options.add_argument("--remote-debugging-port=9222")
+           */
+
 
 
                 /*
@@ -393,27 +409,15 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                 //Включаем логирование, так как сыпяться ошибки.
                 var service = ChromeDriverService.CreateDefaultService();
-                service.LogPath = "chromedriver.log";
+                service.LogPath = browserId.ToString()+"chromedriver.log";
                 service.EnableVerboseLogging = true;
 
 
                 Browser = new OpenQA.Selenium.Chrome.ChromeDriver(service, chromeOptions, 
-                    TimeSpan.FromSeconds(pageLoadTimeouts)); //Время ожидания ответа от  WebDriverа.
+                  TimeSpan.FromSeconds(8)); //Время ожидания ответа от  WebDriverа.
                                                              //Дабы исключить ошибку вида: The HTTP request to the remote WebDriver server for URL
                                                              //http://localhost:38445/session/6fd13ff4c79b9ae2993d94f9c58499d0/url timed out after 60 seconds.
-
-
-                /*
-                 * Я изменил параметры методом проб и ошибок.
-
-chrome_options = Options()
-chrome_options.add_argument('--no-sandbox')
-chrome_options.add_argument('--disable-dev-shm-usage')
-chrome_options.add_argument('--disable-gpu')
-chrome_options.add_argument("--remote-debugging-port=9222")
-                 */
-
-
+        
                 actions = new Actions(Browser);
 
                 //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
@@ -438,7 +442,7 @@ chrome_options.add_argument("--remote-debugging-port=9222")
             return true;
         }
 
-
+       
         int takeScreen = 0;
         private void stopLoadPage()
         {
@@ -455,9 +459,7 @@ chrome_options.add_argument("--remote-debugging-port=9222")
             actions.SendKeys(Keys.Escape);
             Log.Information("stopLoadPage");
         }
-
-
-        bool stop = false;
+          
 
         /// <summary>
         /// Создает скрин шот, в случае ошибок возвращает строку.
@@ -467,26 +469,7 @@ chrome_options.add_argument("--remote-debugging-port=9222")
         /// <returns></returns>
         private string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
         {
-            if (stop)
-            {
-                Thread.Sleep(90000);
 
-                return "Err";
-            }
-
-
-            /*
-             *   Timer timerClearCache;
-             *   
-             *    timerClearComplatePoolTasks = new Timer((Object stateInfo) =>
-            {
-                ClearPoolTasks();
-            }, null, interval1, interval1);
-
-        
-          
-           
-             */
 
             //Выполняю проверку живой ли браузер.
             //Нормально не работает при тестах на виртуалке.
@@ -516,7 +499,8 @@ chrome_options.add_argument("--remote-debugging-port=9222")
             Stopwatch sw = new Stopwatch();
             sw.Start();
             takeScreen = 0;
-            Task ts = new Task(() => stopLoadPage());
+            Task t = new Task(()=>stopLoadPage());
+            t.Start();
 
             try
             {
@@ -528,13 +512,6 @@ chrome_options.add_argument("--remote-debugging-port=9222")
                 string str = "Exception to GoToUrl: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
                 //Обработали исключение, сделали скрин шот, отправили пользователю.
-
-                if(ex.Message.Contains("timed out after 60 seconds"))
-                {
-                    Thread.Sleep(90000);
-                    stop = true;
-                    return "Error";
-                }
             }
         
              //Замеряю истекшее время.
@@ -546,10 +523,8 @@ chrome_options.add_argument("--remote-debugging-port=9222")
                   string bodyText =Browser.FindElement(By.TagName("body")).Text;
                  //Обработка ошибки 404.
                      if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
-
-            Xvfb :1 -screen 0 1024x768x24 -extension RANDR &
            */
-
+            takeScreen = 1;
             Screenshot screenshot = null;
                 try
                 {
@@ -559,13 +534,13 @@ chrome_options.add_argument("--remote-debugging-port=9222")
                catch(Exception ex1)
                 {
                     string str = "Exception to GetScreenshot: " + ex1.Message;
-                    String standartErrorImg = "noLoadPageErr.jpg";
                     saveBrowserErrorDg((int)enumBrowserError.GetScreenshotError, str, url, filename);
-                      //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
-                    return copyFile(standartErrorImg, filename); ;
+                    //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
+                    // String standartErrorImg = "noLoadPageErr.jpg";
+                    // return copyFile(standartErrorImg, filename); ;
                 }
 
-            takeScreen = 1;
+     
 
             //driver.findElement(By.xpath("//a[@class='button allow']/span[text()='Allow cookies']")).click();
 
@@ -574,6 +549,11 @@ chrome_options.add_argument("--remote-debugging-port=9222")
                 //Обрезка.
                 using (var stream = new MemoryStream())
                 {
+                    if(screenshot==null)
+                    {
+                        saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, "screenshot==null", url, filename);
+                    }
+
                     using var image = Image.Load(screenshot.AsByteArray);
                     image.Mutate(x => x
                         //.AutoOrient() // this is the important thing that needed adding

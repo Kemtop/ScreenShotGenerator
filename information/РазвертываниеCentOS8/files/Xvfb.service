@@ -1,0 +1,10 @@
+[Unit]
+Description=Xvfb headless plotting
+After=network.target
+[Service]
+User=nobody
+SyslogIdentifier=%p
+ExecStart=/usr/bin/Xvfb :1 -screen 0 1920x1080x24+32 +extension GLX +render
+
+[Install]
+WantedBy=multi-user.target

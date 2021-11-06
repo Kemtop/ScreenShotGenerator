@@ -1,0 +1,16 @@
+Centos 8. Квадраты вместо русских символов в консоли.
+
+setfont UniCyr_8x16
+Меняем в /etc/vconsole.conf FONT="UniCyr_8x16"
+И перезагружаемся.
+
+vi /etc/sysconfig/network-scripts/ifcfg-ens32
+
+DEVICE=ens32
+BOOTPROTO=static
+IPADDR=192.168.0.155
+NETMASK=255.255.255.0
+GATEWAY=192.168.0.1
+DNS1=192.168.0.54
+DNS2=192.168.0.11
+ONBOOT=yes

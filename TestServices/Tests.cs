@@ -55,7 +55,7 @@ namespace TestServices
             //Данные хостов.
             Dictionary<int, string> hosts = new Dictionary<int, string>();
             hosts.Add(1, "https://localhost:44350");
-            hosts.Add(2, "http://192.168.195.129:5000");
+            hosts.Add(2, "http://192.168.195.130:5000");
             hosts.Add(3, "http://localhost:5000");
 
             //Спрашиваю у пользователя.
@@ -470,7 +470,7 @@ namespace TestServices
                 string elapsedTime = s.ToString("N2");
 
                 //Сохраняет результаты в БД.
-                saveResults(s, jsonAnswer, request);
+                saveResults(elapsedTime, jsonAnswer, request);
 
                 Log.Information("Thread" + threadNum.ToString() + "completed " +
                     pos.ToString() + " line. " + screeShotPerThread.ToString() + " screens " + elapsedTime + " second."); ;
