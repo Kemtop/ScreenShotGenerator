@@ -21,7 +21,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
     /// <summary>
     /// Логика управления браузером.
     /// </summary>
-    public class BrowserControl
+    public class BrowserControlLogic
     {
         /// <summary>
         /// Объект для управления браузером(драйвер).
@@ -55,20 +55,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private saveBrowserError saveBrowserErrorDg;
 
         /// <summary>
-        /// Тайм аут загрузки страницы.
-        /// </summary>
-        private int pageLoadTimeouts;
-        /// <summary>
-        /// Тайм аут загрузки скрипта.
-        /// </summary>
-        private int javaScriptTimeouts;
-
-        /// <summary>
-        /// Путь к текущей папке.
-        /// </summary>
-        private string curentDirectory;
-
-        /// <summary>
         /// Количество задач из пула которые браузер обрабатывает за раз.
         /// </summary>
         public int tasksPerThread { get; set; }
@@ -78,23 +64,24 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public int browserId { get; set; }
 
-        public BrowserControl(IBrowserControl Browser )
+        public BrowserControlLogic(IBrowserControl Browser_, saveBrowserError saveBrowserErrorDg_, string tmpDir)
         {
-            //Путь к рабочей директории приложения.
-            curentDirectory = Directory.GetCurrentDirectory();
-            this.Browser =Browser;
+            saveBrowserErrorDg = saveBrowserErrorDg_;
+            this.tmpDir = tmpDir;
+            Browser = Browser_;
+            Browser.saveBrowserErrorDg = saveBrowserErrorDg;
+           
         }
 
         /// <summary>
-        /// Обработка задач в потоке задач. Выполняется запускает отдельный процесс для проверки и обработки задачи.
+        /// Обработка задач в потоке задач. Запускает отдельную задачу для проверки и обработки пула.
         /// </summary>
         /// <param name="poolTasks"></param>
-        public void processPool(ref poolTasks pool, ref object locker, saveBrowserError saveBrowserErrorDg_, string tmpDir)
+        public void processPool(ref poolTasks pool, ref object locker)
         {
             this.poolTasks = pool;
             this.lockPoolTasks = locker;
-            this.tmpDir = tmpDir;
-            saveBrowserErrorDg = saveBrowserErrorDg_;
+                    
 
             threadIsRun = true; //Задача может работать.
                                 //Запускаю задачу.
@@ -106,12 +93,21 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
 
         /// <summary>
+        /// Запуск браузера.
+        /// </summary>
+        public bool startBrowser()
+        {
+          return Browser.runBrowser();
+        }
+
+
+        /// <summary>
         ///Отстанавливает браузер,завершает задачу.
         /// </summary>
         public void stopProcess()
         {
             threadIsRun = false; //Остановка процесса обработки задач, если запущен.
-            Browser.Quit();
+            Browser.quit();
             //Ждем завершения потока.
             //workThread.Join();
             //Task.WaitAny(workTask);
@@ -183,7 +179,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                     //Cоздание скриншота.
                     // Log.Information("take "+p.url+";Browser="+browserId.ToString());
-                    string err = takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime);
+                    string err = Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime);
                     //Log.Information("end " + p.url + ";Browser=" + browserId.ToString());
 
                     //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
@@ -315,211 +311,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
         }
 
-
-        /// <summary>
-        /// Настраивает драйвер, и вызвает запуск браузера.
-        /// </summary>
-        private bool runBrowser()
-        {
-            try
-            {
-
-
-                //Отключить загрузку файлов.
-                //firefox -p
-                FirefoxOptions options = new FirefoxOptions();
-                FirefoxProfile profile = new FirefoxProfileManager().GetProfile("/home/screenShotService/site/4h9zjw8h.user");
-                if (profile == null)
-                {
-                    Log.Information("null profile");
-                    // options.SetPreference("javascript.enabled",false);
-                    //Долждна быть установлена версия дравера 0.30.0.1 иначе работать не будет.
-                    options.SetPreference("webgl.disabled", true);
-                    //browser.privatebrowsing.autostart
-
-                }
-                else
-                {
-                    options.Profile = profile;
-                }
-
-
-
-                Browser = new FirefoxDriver(options);
-                Log.Information("io");
-
-                // Browser = new OpenQA.Selenium.Chrome.
-                //   TimeSpan.FromSeconds(8)); //Время ожидания ответа от  WebDriverа.
-                //Дабы исключить ошибку вида: The HTTP request to the remote WebDriver server for URL
-                //http://localhost:38445/session/6fd13ff4c79b9ae2993d94f9c58499d0/url timed out after 60 seconds.
-
-                // actions = new Actions(Browser);
-
-                //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
-                //к тайм ауту взаимодействия с драйвером. Исключаем такую ситуацию.
-                Browser.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(pageLoadTimeouts);
-                Browser.Manage().Timeouts().AsynchronousJavaScript = TimeSpan.FromSeconds(javaScriptTimeouts);
-
-                //Установка размера.
-                Browser.Manage().Window.Position = new System.Drawing.Point(0, 0); ;
-                Browser.Manage().Window.Size = new System.Drawing.Size(1280, 1060);
-
-
-            }
-            catch (Exception ex)
-            {
-                //Исключение если не верная версия браузера.
-                String msg = "Exeption on metod runBrowser(user=" + Environment.UserName + "):" + ex.Message;
-                Log.Error(msg);
-                return false;
-            }
-
-            return true;
-        }
-
-
-        int takeScreen = 0;
-        private void stopLoadPage()
-        {
-
-            int max = pageLoadTimeouts * 100;
-            int cnt = 0;
-            while (takeScreen == 0)
-            {
-                if (cnt > max) break;
-                Task.Delay(10);
-                cnt++;
-            }
-            if (takeScreen == 1) return;
-           // actions.SendKeys(Keys.Escape);
-           // Log.Information("stopLoadPage");
-        }
-
-
-        /// <summary>
-        /// Создает скрин шот, в случае ошибок возвращает строку.
-        /// </summary>
-        /// <param name="url"></param>
-        /// <param name="filename"></param>
-        /// <returns></returns>
-        private string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime)
-        {
-
-
-            //Выполняю проверку живой ли браузер.
-            //Нормально не работает при тестах на виртуалке.
-            /*
-            try
-            {
-            //Если с объектом что то не то-думаю должно высыпаться. Но как проверить пока не ясно.
-            // string ttl = Browser.Title; Титл выбивает тайм аут 60сек.
-            string ttl = Browser.Url;
-
-            if (ttl==null)
-                {
-                    saveBrowserErrorDg((int)enumBrowserError.Debug, "Warning! Browser title is null. May be crash?",url,filename);
-                }
-
-            }
-            catch(Exception ex)
-            {
-                string str = "Exception to check title. Browser may be dead.: " + ex.Message;
-                saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename); 
-                return "Error 701";
-            }
-
-        */
-
-            //Измеряю затраченное время на открытие страницы.
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            takeScreen = 0;
-            Task t = new Task(() => stopLoadPage());
-            t.Start();
-
-            try
-            {
-                //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
-                Browser.Navigate().GoToUrl(url);
-            }
-            catch (Exception ex)
-            {
-                string str = "Exception to GoToUrl: " + ex.Message;
-                saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
-                //Обработали исключение, сделали скрин шот, отправили пользователю.
-            }
-
-            //Замеряю истекшее время.
-            sw.Stop();
-            double elipsed = sw.Elapsed.TotalSeconds;
-            elipsedTime = (float)Math.Round(elipsed, 2);
-            /* 
-             * Если потребуется обработка ошибок.
-                  string bodyText =Browser.FindElement(By.TagName("body")).Text;
-                 //Обработка ошибки 404.
-                     if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
-           */
-            takeScreen = 1;
-            Screenshot screenshot = null;
-            try
-            {
-                //Создание скриншотта.
-                screenshot = ((ITakesScreenshot)Browser).GetScreenshot();
-            }
-            catch (Exception ex1)
-            {
-                string str = "Exception to GetScreenshot: " + ex1.Message;
-                saveBrowserErrorDg((int)enumBrowserError.GetScreenshotError, str, url, filename);
-                //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
-                // String standartErrorImg = "noLoadPageErr.jpg";
-                // return copyFile(standartErrorImg, filename); ;
-            }
-
-
-
-            //driver.findElement(By.xpath("//a[@class='button allow']/span[text()='Allow cookies']")).click();
-
-            try
-            {
-                //Обрезка.
-                using (var stream = new MemoryStream())
-                {
-                    if (screenshot == null)
-                    {
-                        saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, "screenshot==null", url, filename);
-                    }
-
-                    using var image = Image.Load(screenshot.AsByteArray);
-                    image.Mutate(x => x
-                        //.AutoOrient() // this is the important thing that needed adding
-                        .Resize(new ResizeOptions
-                        {
-                            Mode = ResizeMode.Crop,
-                            Position = AnchorPositionMode.Center,
-                            Size = new SixLabors.ImageSharp.Size(1260, 965)
-                        })
-                        .BackgroundColor(SixLabors.ImageSharp.Color.White));
-
-
-                    string filePathFull = Path.Combine(curentDirectory, filePath);
-                    image.Save(filePathFull, new JpegEncoder() { Quality = 85 });
-
-
-
-                }
-            }
-            catch (Exception ex)
-            {
-                //Добавить стандартную картинку.
-                String str = "Exception in metod takeScreenShot where save screenshot: " + ex.Message;
-                saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename);
-                return "Error 702";
-            }
-
-            return null;
-
-        }
-
+      
         /// <summary>
         /// Копирует файл.
         /// </summary>
@@ -596,17 +388,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             return 0;
         }
 
-        /// <summary>
-        /// Задает тайм ауты.
-        /// </summary>
-        /// <param name="pageLoadTimeouts"></param>
-        /// <param name="javaScriptTimeouts"></param>
-        public void setTimeouts(int pageLoadTimeouts, int javaScriptTimeouts)
-        {
-            this.pageLoadTimeouts = pageLoadTimeouts;
-            this.javaScriptTimeouts = javaScriptTimeouts;
-        }
-
+    
 
         /*
         /// <summary>

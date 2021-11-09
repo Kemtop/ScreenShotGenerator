@@ -39,4 +39,22 @@
 	"CheckNeedClearCashAfterStartup": "60"- минут, время запуска задачи очистки кеша после запуска приложения.
   },
   "AllowedHosts": "*"
+  
+         options.SetPreference("webgl.disabled", true); //Отключаем работу с GPU.
+            options.SetPreference("browser.privatebrowsing.autostart", true);//Инкогнито.
+                                                                             //Отключаю кеш.
+                                                                             // options.SetPreference("browser.cache.disk.enable",false);
+                                                                             // options.SetPreference("browser.cache.memory.enable", false);
+            options.SetPreference("network.http.use-cache", 1);//Глобальное отключение кеши.
+			"app.update.enabled"  старое,
+app.update.auto.migrated			отключить автообновление. 
+	dom.webnotifications.enabled
+3) Чтобы отключить PUSH-УВЕДОМЛЕНИЯ, дважды щелкните параметр dom.webnotifications.serviceworker.enabled, чтобы переключить его значение с true на false - сайты по-прежнему могут генерировать уведомления на рабочем столе, пока у вас есть открытая вкладка.
+
+(4) Чтобы отключить ВСЕ УВЕДОМЛЕНИЯ, дважды щелкните параметр dom.webnotifications.enabled, чтобы переключить его значение с true на false - это главный переключатель, вы не получите никаких уведомлений на рабочем столе с сайтов.
+
+Как отключить уведомление о загрузке в панели задач?
+browser.download.manager.showAlertOnComplete
+дважды щелкните этот параметр, чтобы переключить его на False , затем перезапустите Firefox.
+
 }

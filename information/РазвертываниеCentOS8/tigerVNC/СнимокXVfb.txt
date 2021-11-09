@@ -1,0 +1,26 @@
+Debian / Ubuntu: для установки xwdи convertзапуска:apt-get install x11-apps imagemagick
+dnf install x11-apps imagemagick
+xwd -display :1 -root -silent | convert xwd:- png:screenshot.png
+DISPLAY=:1.0 import -window root /tmp/screenshot.png
+dnf install xorg-xwd
+
+dnf install  imagemagick
+
+Включить репозиторий PowerTools,RealTime:
+Log in to the server and switch to the root user
+Edit the PowerTools repo file
+# vim /etc/yum.repos.d/CentOS-PowerTools.repo
+1
+# vim /etc/yum.repos.d/CentOS-PowerTools.repo
+Change enabled=0 to enabled=1
+
+ dnf -y install xorg-x11-apps
+ 
+ yum install ImageMagick -y
+ 
+ https://download.imagemagick.org/ImageMagick/download/linux/CentOS/x86_64/ImageMagick-6.9.12-28.x86_64.rpm
+
+---------Помогло!! 
+ dnf install -y epel-release
+ dnf config-manager --set-enabled PowerTools
+dnf install -y ImageMagick ImageMagick-devel

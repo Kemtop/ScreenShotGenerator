@@ -24,7 +24,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
     /// <summary>
     /// Реализация управления браузером Chrome.
     /// </summary>
-    public class ImpBrowserControlChrome : IBrowserControl
+    public class ImpBrowserControlChrome //: IBrowserControl
     {
         /// <summary>
         /// Объект для управления браузером(драйвер).

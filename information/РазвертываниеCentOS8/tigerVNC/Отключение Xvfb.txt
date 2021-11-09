@@ -1,0 +1,6 @@
+Для проверки что делает браузер через vnc
+
+systemctl stop Xvfb
+vncserver :1 -geometry 1600x1200
+vncserver -kill :1
+перейти на пользователя su screenShotService

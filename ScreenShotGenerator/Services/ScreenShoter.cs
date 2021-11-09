@@ -62,7 +62,7 @@ namespace ScreenShotGenerator.Services
         cacheRam Cache;
 
         //Пул объектов для управления браузерами.
-        List<IBrowserControl> poolBrowserControls;
+        List<BrowserControlLogic> poolBrowserControls;
 
         int poolBrowserSize = 1; //Количество запущенных браузеров.
         int browserTasksPerThread = 5; //Количество задач из пула которые браузер обрабатывает за раз.
@@ -127,7 +127,7 @@ namespace ScreenShotGenerator.Services
             poolTask = new poolTasks();
            
             Cache = new cacheRam();
-            poolBrowserControls = new List<IBrowserControl>();
+            poolBrowserControls = new List<BrowserControlLogic>();
 
             //Чтение настроек сервиса.
             readSettingsFromDb();
@@ -268,10 +268,10 @@ namespace ScreenShotGenerator.Services
             Log.Information("Stoping services...");
 
             int i = 1;
-            foreach (IBrowserControl bc in poolBrowserControls)
+            foreach (BrowserControlLogic bl in poolBrowserControls)
             {
                 Log.Information("Close browser..." + i.ToString());
-                bc.stopProcess();
+                bl.stopProcess();
                 i++;
             }
 
@@ -299,17 +299,18 @@ namespace ScreenShotGenerator.Services
                 
                 try
                 {
-                    IBrowserControl Bc = new ImpBrowserControlFireFox();//new ImpBrowserControlChrome();
-                    Bc.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
-                    Bc.browserId=i + 1; //Ид браузера, что бы потоки как то можно отличать.
-                    Bc.setTimeouts(pageLoadTimeouts, javaScriptTimeouts); //Задаю таймауты загрузки.
-
-                    if (!Bc.startBrowser())//Запустить браузер. Выходим если не смог.
+                    //Создаем экземпляр обьекта для управления браузером.
+                    BrowserControlLogic Bl = new BrowserControlLogic(
+                        new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
+                        saveBrowserErrorDg, tmpDir) ;//new ImpBrowserControlChrome();
+                    Bl.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
+                    Bl.browserId=i + 1; //Ид браузера, что бы потоки как то можно отличать.
+               
+                    if (!Bl.startBrowser())//Запустить браузер. Выходим если не смог.
                         break;
-
-                    //Пока не понятно нужна ли тут задержка.
-                    Bc.processPool(ref poolTask, ref lockPoolTask, saveBrowserErrorDg, tmpDir); //Запустить обработку пула задач.
-                    poolBrowserControls.Add(Bc);
+                                        
+                    Bl.processPool(ref poolTask, ref lockPoolTask); //Запустить обработку пула задач.
+                    poolBrowserControls.Add(Bl);
                 }
                 catch (Exception ex)
                 {

@@ -1,0 +1,42 @@
+[Unit]
+Description=Screen Shot Service running.
+
+[Service]
+User=screenShotService
+WorkingDirectory=/home/screenShotService/site
+#ExecStart=/usr/bin/dotnet /home/screenShotService/site/ScreenShotGenerator.dll
+ExecStart=/bin/sh -c '/usr/bin/dotnet /home/screenShotService/site/ScreenShotGenerator.dll >/home/screenShotService/site/serviceLog/logErr.log 2>&1 > /home/screenShotService/site/serviceLog/logOut.log' 
+Restart=no
+# Restart service after 10 seconds if the dotnet service crashes:
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=screenShotService
+#Environment 
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DISPLAY=:1.0
+Environment=DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/0/bus"
+Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR="/root/.cache/dotnet_bundle_extract"
+Environment=DOTNET_ROOT="/usr/lib64/dotnet"
+Environment=HISTCONTROL="ignoreboth"
+Environment=HISTSIZE="1000"
+Environment=HOME="/home/screenShotService"
+Environment=HOSTNAME="localhost.localdomain"
+Environment=LANG="ru_RU.UTF-8"
+Environment=LESSOPEN="||/usr/bin/lesspipe.sh %s"
+Environment=LOGNAME="screenShotService"
+Environment=OLDPWD="/home"
+Environment=PATH="/home/screenShotService/.local/bin:/home/screenShotService/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/.dotnet/tools:/root/bin:/home/screenShotService/.dotnet/tools"
+Environment=PWD="/home/screenShotService"
+Environment=SHELL="/bin/bash"
+Environment=TERM="xterm"
+Environment=USER="screenShotService"
+Environment=XDG_RUNTIME_DIR="/run/user/1002"
+Environment=XDG_SESSION_ID="4"
+
+
+#Using the * to will listen to any IP the machine may have.
+Environment=ASPNETCORE_URLS=http://*:5000
+#-->;https://*:5001 need to generate sertificate.
+
+[Install]
+WantedBy=multi-user.target
