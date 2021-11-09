@@ -2,7 +2,8 @@
 
 ?url[0]=https://google.ru&allowedReferer=1&useEncoding
 ?url[0]=https://mail.ru&allowedReferer=1
-
+?url[0]=https://onlinezakladki.ru/&allowedReferer=1
+javascript.enabled
 Не существующий урл
 .
 ?url[0]=https://goo111uogle.ru&allowedReferer=1
@@ -38,3 +39,10 @@ https://localhost:44350/?url[0]=https://yandex.ru/efir?reqid=1601258222163493-15
 
 ?url[0]=https://www.timeanddate.com/stopwatch/&allowedReferer=1
 ?url[0]=https://www.asus.com/ru/Motherboards/M5A78L-M-PLUS-USB3/&allowedReferer=1
+
+
+Тест фаер фокса редирект.
+http://46.254.21.204:5000/?url[0]=https://onlinezakladki.ru/%3FnoRedirect/&allowedReferer=1
+
+http://46.254.21.204:5000/?url[0]=https%3A%2F%2Fonlinezakladki.ru%2F%3FnoRedirect&allowedReferer=1
+http://46.254.21.204:5000/?url[0]=https%3A%2F%2Fonlinezakladki.ru%2F%3FnoRedirect&allowedReferer=1

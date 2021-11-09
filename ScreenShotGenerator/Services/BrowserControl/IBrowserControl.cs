@@ -47,6 +47,16 @@ namespace ScreenShotGenerator.Services.BrowserControl
         ///Остановка браузера.
         /// </summary>
         void stopProcess();
-        
+
+        /// <summary>
+        /// Настраивает драйвер, и вызвает запуск браузера.
+        /// </summary>
+        bool runBrowser();
+
+        /// <summary>
+        /// Выход из браузера.
+        /// </summary>
+        void Quit();
+
     }
 }

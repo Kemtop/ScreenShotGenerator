@@ -299,7 +299,7 @@ namespace ScreenShotGenerator.Services
                 
                 try
                 {
-                    IBrowserControl Bc = new ImpBrowserControlChrome();
+                    IBrowserControl Bc = new ImpBrowserControlFireFox();//new ImpBrowserControlChrome();
                     Bc.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
                     Bc.browserId=i + 1; //Ид браузера, что бы потоки как то можно отличать.
                     Bc.setTimeouts(pageLoadTimeouts, javaScriptTimeouts); //Задаю таймауты загрузки.
