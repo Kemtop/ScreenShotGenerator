@@ -24,42 +24,17 @@ namespace ScreenShotGenerator.Services.BrowserControl
     /// <summary>
     /// Реализация управления браузером Chrome.
     /// </summary>
-    public class ImpBrowserControlChrome //: IBrowserControl
+    public class ImpBrowserControlChrome : IBrowserControl
     {
         /// <summary>
         /// Объект для управления браузером(драйвер).
         /// </summary>
         private IWebDriver Browser;
-
-        /// <summary>
-        /// Действия браузера.
-        /// </summary>
-        private Actions actions;
-
-        //Пул задач.
-        private poolTasks poolTasks;
-        /// <summary>
-        /// Разрешен запуск потока. Флаг используется для остановки потока.
-        /// </summary>
-        private bool threadIsRun;
-
-        //Синхронизация потоков.
-        private object lockPoolTasks;
-
-        //Директория для хранения картинок.
-        private string tmpDir;
-
-        /// <summary>
-        /// Задача выборки данных из пула и их обработки.
-        /// </summary>
-        // private Task workTask;
-        //private Thread workThread;
-        private Task workThread;
-
+        
         /// <summary>
         /// Делегат для сохранения сведений об ошибках браузера.
         /// </summary>
-        private saveBrowserError saveBrowserErrorDg;
+        public saveBrowserError saveBrowserErrorDg { get; set; }
 
         /// <summary>
         /// Тайм аут загрузки страницы.
@@ -75,351 +50,100 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private string curentDirectory;
 
-
+        /// <summary>
+        /// Включить подробное логирование.
+        /// </summary>
+        private bool enableLog;
 
         /// <summary>
-        /// Количество задач из пула которые браузер обрабатывает за раз.
+        /// Идентификатор браузера, нужен только для логирования.
         /// </summary>
-        public int tasksPerThread { get; set; }
-
-        /// <summary>
-        /// Идентификатор браузера.
-        /// </summary>
-        public int browserId { get; set; }
-
-
-        public ImpBrowserControlChrome()
+        private int browserId;
+        public ImpBrowserControlChrome(int pageLoadTimeouts, int javaScriptTimeouts,bool enableLog,int browserId)
         {
             //Путь к рабочей директории приложения.
             curentDirectory = Directory.GetCurrentDirectory();
-        }
-           
-
-        /// <summary>
-        /// Обработка задач в потоке задач. Выполняется запускает отдельный процесс для проверки и обработки задачи.
-        /// </summary>
-        /// <param name="poolTasks"></param>
-        public void processPool(ref poolTasks pool, ref object locker, saveBrowserError saveBrowserErrorDg_, string tmpDir)
-        {
-            this.poolTasks = pool;
-            this.lockPoolTasks = locker;
-            this.tmpDir = tmpDir;
-            saveBrowserErrorDg = saveBrowserErrorDg_;
-
-            threadIsRun = true; //Задача может работать.
-                                //Запускаю задачу.
-            workThread = new Task(processPoolThread);
-                                // workTask.Start();
-            //workThread = new Thread(processPoolThread);
-            workThread.Start();
-        }
-
-        /// <summary>
-        /// Запуск браузера.
-        /// </summary>
-        public bool startBrowser()
-        {
-           return runBrowser();
+            this.pageLoadTimeouts = pageLoadTimeouts;
+            this.javaScriptTimeouts = javaScriptTimeouts;
+            this.enableLog = enableLog;
+            this.browserId = browserId;
         }
 
 
-        /// <summary>
-        ///Отстанавливает браузер,завершает задачу.
-        /// </summary>
-        public void stopProcess()
-        {
-            threadIsRun = false; //Остановка процесса обработки задач, если запущен.
-            Browser.Quit();
-            //Ждем завершения потока.
-            //workThread.Join();
-            //Task.WaitAny(workTask);
-            Task.WaitAny(workThread);
-        }
-
 
         /// <summary>
-        /// Проверяет есть ли в пуле новые задачи, выполняет их.
+        /// Считываю из appsettings.json опции браузера.
         /// </summary>
-        private void processPoolThread()
+        /// <returns></returns>
+        private ChromeOptions createOptions()
         {
-            while (threadIsRun)
+            //Читаю настройки браузера.
+            Dictionary<string, object> Dic = ThingsForBrowser.readConfigBrowser("Chrome");
+
+            ChromeOptions chromeOptions = new ChromeOptions();
+            bool boolValue;
+            int intValue;
+            float floatValue;
+
+            foreach (KeyValuePair<string, object> l in Dic)
             {
-                //Список задач из пула.
-                List<mJobPool> data=null; 
-
-                //Блокирую пул для других потоков.
-                lock (lockPoolTasks)
+                //Увы но не смотря на типы в json все значения приходят с типом string.
+                if (Boolean.TryParse(l.Value.ToString(), out boolValue))
                 {
-                    data = poolTasks.getNeedProcessing(tasksPerThread);
-
-                    //Есть новые задачи.
-                    if(data.Count>0)
-                    {
-                        //Блокирует для обработки. Другие потоки не будут обращать внимания на данные объекты.
-                        foreach (mJobPool p in data)
-                        {
-                            p.status = (int)enumTaskStatus.LockByBrowser;
-                            p.browserId = browserId;
-                        }
-                    }
-
+                    chromeOptions.AddUserProfilePreference(l.Key, boolValue);
+                    continue;
                 }
 
-
-                //Пул заблокирован или нет данных для обработки.
-                if ((data==null)||(data.Count == 0)) 
+                if (Int32.TryParse(l.Value.ToString(), out intValue))
                 {
-                    //Сервис останавливают. Выходим.
-                    if (!threadIsRun) return;
-                    Thread.Sleep(1000);
+                    chromeOptions.AddUserProfilePreference(l.Key, intValue);
+                    continue;
+                }
+
+                if (float.TryParse(l.Value.ToString(), out floatValue))
+                {
+                    chromeOptions.AddUserProfilePreference(l.Key, floatValue);
                     continue;
                 }
 
 
-                foreach (mJobPool p in data)
-                {                    
-                    //Сервис останавливают. Выходим.
-                    if (!threadIsRun) return;
+                //И ни то и не другое,значит точно строка.
+                //Приходит аргрумент. Начинается с --.
+                if (l.Key[0] == '-')
+                    chromeOptions.AddArgument(l.Key);
+                else
+                    chromeOptions.AddUserProfilePreference(l.Key, l.Value);
 
-                    //Проверка урл на пустоту.
-                    if(String.IsNullOrEmpty(p.url))
-                    {
-                        string errMsg = "Error:Empty url!";
-                        p.status = (int)enumTaskStatus.Error;
-                        p.fileName = errMsg;
-                        //Сохраняю логи в БД.
-                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);                        
-                        continue;
-                    }
-
-
-                    String lastError = null; //Последнее сообщение об ошибке, если есть.
-                    p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
-                    //Путь куда сохранять файл.
-                    string filePath = Path.Combine("wwwroot/" + tmpDir, p.fileName);
-                
-                   
-                    //Cоздание скриншота.
-                   // Log.Information("take "+p.url+";Browser="+browserId.ToString());
-                    string err=takeScreenShot(p.url, filePath,p.fileName,ref p.wastedTime);
-                    //Log.Information("end " + p.url + ";Browser=" + browserId.ToString());
-
-                    //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
-                    if (!threadIsRun) return;
-
-                    p.timestamp = DateTime.Now;
-
-                    bool allGood = true; //Нет ошибок в процессе работы.
-
-                    //Ошибка создания скрин шота.
-                    if(err!=null)
-                    {
-                        lastError= err;
-                        allGood = false;
-                    }
-                    else
-                    {                        
-                        // Проверяет итоговый файл на существование, на размер,
-                        // и на заполнение только белым или только черным.
-                        allGood = checkResultFile(out lastError,filePath);
-                    }                  
-                 
-                    //Пока пул не будет доступен. Или поток не остановят.
-                    while(threadIsRun)
-                    {
-                        lock(lockPoolTasks)
-                        {
-                            //Были ли ошибки?
-                            if (allGood)
-                                p.status = (int)enumTaskStatus.End; //Все хорошо.
-                            else
-                            {
-                                p.status = (int)enumTaskStatus.Error;
-                                p.fileName = lastError;
-                                //Сохраняю логи в БД.
-                                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError,lastError, p.url, p.fileName);
-                            }
-                                
-
-                            break;
-                        }
-
-                        Task.Delay(300);
-                    }    
-
-                  
-                }
-            }
-        }
-
-        /// <summary>
-        /// Проверяет итоговый файл на существование, на размер, и на заполнение только белым или только черным.
-        /// Если все хорошо=true.
-        /// </summary>
-        /// <param name="errMess"></param>
-        /// <param name="pathToFile"></param>
-        /// <returns></returns>
-        private bool checkResultFile(out string errMess,string pathToFile)
-        {
-            errMess = null;
-
-            //Почему то файл не создался. 
-            if (!checkExistFile(pathToFile))
-            {
-                errMess = "File no exist.";
-                return false;
             }
 
-
-            //Почему то файл пуст.
-            if (!checkFileSize(pathToFile))
-            {
-                errMess = "File length is 0.";
-                return false;
-            }
-
-            //Проверяет не вернул ли браузер черную или белую картинку.
-            int chkColorErr = imgOnlyBlackOrWhite(pathToFile);
-            if (chkColorErr != 0)
-            {
-                errMess = "Image contains only " + ((chkColorErr == 1) ? "white" : "black") + " pixels.";
-                return false;
-            }
-
-            return true;
-        }
-
-
-        /// <summary>
-        /// Проверяю существования файла в папке кеша.
-        /// </summary>
-        /// <param name="fileName"></param>
-        /// <returns></returns>
-        private bool checkExistFile(string path)
-        {            
-            bool exists = System.IO.File.Exists(path);
-            return exists;
-        }
-
-        /// <summary>
-        /// Проверяю размер файла.
-        /// </summary>
-        /// <param name="fileName"></param>
-        /// <returns></returns>
-        private bool checkFileSize(string path)
-        {
-
-            long length = new System.IO.FileInfo(path).Length;
-
-            if (length == 0) return false;
-
-            return true;
-        }
-
-       
-        /// <summary>
-        /// На основании входной строки формирует ее хеш
-        /// </summary>
-        /// <param name="input"></param>
-        /// <returns></returns>
-        private string getMD5(String input)
-        {
-
-            using (var md5 = MD5.Create())
-            {
-                var result = md5.ComputeHash(Encoding.ASCII.GetBytes(input));
-                return string.Join("", result.Select(x => x.ToString("X2"))).ToLower();
-            }
-
+            return chromeOptions;
         }
 
 
         /// <summary>
         /// Настраивает драйвер, и вызвает запуск браузера.
         /// </summary>
-        private bool runBrowser()
+        public bool runBrowser()
         {
             try
             {
-
-                var chromeOptions = new ChromeOptions();
-                //Работаем на сервере без видеокарты.
-                chromeOptions.AddArgument("--disable-gpu");
-
-                //Опции из index.php.
-                //--window-size=1280,1060 //вынесено выше в другую логику.
-                chromeOptions.AddArgument("--window-size=1920,1080");
-                //локальная папка для браузера.профиль.не работает на винде,ни чего не открывает.
-                //На linux сжирает в два раза больше памяти.
-                // chromeOptions.AddArgument("--user-data-dir=usr_dir"); 
-                chromeOptions.AddArgument("--window-position=0,0");//
-                //--display=:$DISP думаю пока не нужно, так как в окружении службы задано.
-                //chromeOptions.AddArgument("--window-size=768x1024");
-                chromeOptions.AddArgument("--incognito");// 
-                chromeOptions.AddArgument("--disable-cache");// 
-                chromeOptions.AddArgument("--disable-component-update");// ";
-                chromeOptions.AddArgument("--disable-desktop-notifications");
-                chromeOptions.AddArgument("--disable-translate");
-                chromeOptions.AddArgument("--enable-download-notification");
-                //Какое то хранилище браузера, описание так и не нашел.
-                chromeOptions.AddArgument("--disable-dev-shm-usage");
-                chromeOptions.AddArgument("--ignore-certificate-errors-spki-list");
-                chromeOptions.AddArgument("--remote-debugging-port=9222");
-               // chromeOptions.AddArgument("no-sandbox");
-                chromeOptions.AddArgument("--mute-audio");
-                chromeOptions.AddArgument("--ignore-certificate-errors");
-
-                // Для bluetoth ошибки "excludeSwitches", ["enable-logging"])
-
-                //Попытка исправить ошибку
-                /*
-                 * 
-                 * 	Exception to GoToUrl: timeout: Timed out receiving message from renderer: 
-                 * 	-31.468 (Session info: chrome=95.0.4638.69)
-                 */
-                //chromeOptions.AddArguments("no-sandbox");
-                //chromeOptions.AddArguments("--force-device-scale-factor=1");
-
-                //Предлагают disable-dev-shm-usage
-
-                /*
-           * Я изменил параметры методом проб и ошибок.
-
-chrome_options = Options()
-chrome_options.add_argument('--no-sandbox')
-chrome_options.add_argument('--disable-dev-shm-usage')
-chrome_options.add_argument('--disable-gpu')
-chrome_options.add_argument("--remote-debugging-port=9222")
-           */
-
-
-
-                /*
-                 * В Chrome «Разрешить ограничения на загрузку» есть 4 варианта:
-                    0 = нет особых ограничений
-                    1 = блокировать опасные загрузки
-                    2 = блокировать потенциально опасные загрузки
-                    3 = заблокировать все загрузки
-                    4 = блокировать вредоносные загрузки
-                 */
-                //Отключить загрузку файлов.              
-                chromeOptions.AddArgument("--disable-infobars");
-                chromeOptions.AddUserProfilePreference("download_restrictions" , 3);
-               // chromeOptions.AddArgument("--remote-debugging-port=0");
-
-                //Включаем логирование, так как сыпяться ошибки.
-                var service = ChromeDriverService.CreateDefaultService();
-                service.LogPath = browserId.ToString()+"chromedriver.log";
-                service.EnableVerboseLogging = true;
-
-
-                Browser = new OpenQA.Selenium.Chrome.ChromeDriver(service, chromeOptions, 
-                  TimeSpan.FromSeconds(8)); //Время ожидания ответа от  WebDriverа.
-                                                             //Дабы исключить ошибку вида: The HTTP request to the remote WebDriver server for URL
-                                                             //http://localhost:38445/session/6fd13ff4c79b9ae2993d94f9c58499d0/url timed out after 60 seconds.
+                // Считываю из appsettings.json опции браузера.
+                ChromeOptions chromeOptions = createOptions();
         
-                actions = new Actions(Browser);
-
+                //Включаем логирование, так как сыпяться ошибки.
+                if(enableLog)
+                {
+                    var service = ChromeDriverService.CreateDefaultService();
+                     service.LogPath = "chromedriver_"+browserId.ToString() + ".log";
+                    service.EnableVerboseLogging = true;
+                    Browser = new OpenQA.Selenium.Chrome.ChromeDriver(service, chromeOptions,
+                  TimeSpan.FromSeconds(8));
+                }
+                else
+                {
+                    Browser = new OpenQA.Selenium.Chrome.ChromeDriver(chromeOptions);
+                }
+              
                 //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
                 //к тайм ауту взаимодействия с драйвером. Исключаем такую ситуацию.
                 Browser.Manage().Timeouts().PageLoad=TimeSpan.FromSeconds(pageLoadTimeouts);
@@ -429,7 +153,6 @@ chrome_options.add_argument("--remote-debugging-port=9222")
                 Browser.Manage().Window.Position = new System.Drawing.Point(0, 0); ;          
                 Browser.Manage().Window.Size = new System.Drawing.Size(1280, 1060);
        
-
             }
             catch (Exception ex)
             {
@@ -442,32 +165,14 @@ chrome_options.add_argument("--remote-debugging-port=9222")
             return true;
         }
 
-       
-        int takeScreen = 0;
-        private void stopLoadPage()
-        {
-           
-            int max = pageLoadTimeouts * 100;
-            int cnt = 0;
-            while(takeScreen==0)
-            {
-                if (cnt > max) break;
-                Task.Delay(10);
-                cnt++;
-            }
-            if (takeScreen == 1) return;
-            actions.SendKeys(Keys.Escape);
-            Log.Information("stopLoadPage");
-        }
-          
-
+     
         /// <summary>
         /// Создает скрин шот, в случае ошибок возвращает строку.
         /// </summary>
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        private string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
+        public string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
         {
 
 
@@ -498,9 +203,7 @@ chrome_options.add_argument("--remote-debugging-port=9222")
             //Измеряю затраченное время на открытие страницы.
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            takeScreen = 0;
-            Task t = new Task(()=>stopLoadPage());
-            t.Start();
+         
 
             try
             {
@@ -524,7 +227,7 @@ chrome_options.add_argument("--remote-debugging-port=9222")
                  //Обработка ошибки 404.
                      if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
            */
-            takeScreen = 1;
+           
             Screenshot screenshot = null;
                 try
                 {
@@ -546,32 +249,16 @@ chrome_options.add_argument("--remote-debugging-port=9222")
 
             try
             {
-                //Обрезка.
-                using (var stream = new MemoryStream())
+                if (screenshot == null)
                 {
-                    if(screenshot==null)
-                    {
-                        saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, "screenshot==null", url, filename);
-                    }
-
-                    using var image = Image.Load(screenshot.AsByteArray);
-                    image.Mutate(x => x
-                        //.AutoOrient() // this is the important thing that needed adding
-                        .Resize(new ResizeOptions
-                        {
-                            Mode = ResizeMode.Crop,
-                            Position = AnchorPositionMode.Center,
-                            Size = new SixLabors.ImageSharp.Size(1260, 965)
-                        })
-                        .BackgroundColor(SixLabors.ImageSharp.Color.White));
-
-
-                    string filePathFull = Path.Combine(curentDirectory,filePath);
-                    image.Save(filePathFull, new JpegEncoder() { Quality = 85 });
-
-
-
+                    saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, "screenshot==null", url, filename);
                 }
+
+                string filePathFull = Path.Combine(curentDirectory, filePath);
+                //Сохраняю картинку.
+                ThingsForBrowser.cutAndSave(screenshot.AsByteArray,filePathFull);
+
+            
             }catch(Exception ex)
             {
                 //Добавить стандартную картинку.
@@ -584,138 +271,10 @@ chrome_options.add_argument("--remote-debugging-port=9222")
 
         }
 
-        /// <summary>
-        /// Копирует файл.
-        /// </summary>
-        private string copyFile(string src,string dst)
+        public void quit()
         {
-            try
-            {
-                string filePath1 = Path.Combine("wwwroot/" + tmpDir, src);
-                string filePath2 = Path.Combine("wwwroot/" + tmpDir, dst);
-                File.Copy(filePath1, filePath2);
-            }
-            catch(Exception ex)
-            {
-                return "Error сopy file "+src+" to "+dst+". "+ex.Message;
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Проверяет содержит ли картинка только черные или белые пиксели.
-        /// Т.е. рисунок полностью белый или полностью черный.
-        /// Если только белые=1, если только черные=2, нет однотонных =0
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        private int imgOnlyBlackOrWhite(string path)
-        {
-            //Думаю что вся картинка содержит черные пиксели.
-            bool onlyWhite = true;
-            bool onlyBlack = true;
-
-            using (var image = new MagickImage(path))
-            {
-                MagickColor white = MagickColors.White;
-                MagickColor black = MagickColors.Black;
-
-                using (IPixelCollection<ushort> pixels = image.GetPixels())
-                {
-                    //Проверка наличия только белых пикселей.
-                    foreach (var pixel in pixels)
-                    {
-                        IMagickColor<ushort> color = pixel.ToColor();
-                        if (!((color.R == white.R) && (color.G == white.G) && (color.B == white.B) &&
-                            (color.A == white.A) && (color.K == white.K)))
-                        {
-                            onlyWhite = false;
-                            break;
-                        }
-
-                    }
-
-                    if (onlyWhite) return 1; //Только белый.
-
-                    //Проверка наличия только черных пикселей.
-                    foreach (var pixel in pixels)
-                    {
-                        IMagickColor<ushort> color = pixel.ToColor();
-                        if (!((color.R == black.R) && (color.G == black.G) && (color.B == black.B) &&
-                           (color.A == black.A) && (color.K == black.K)))
-                        {
-                            onlyBlack = false;
-                            break;
-                        }
-
-                    }
-
-                    if (onlyBlack) return 2; //Только черный.
-
-                }
-
-            }
-
-            return 0;
-        }
-
-        /// <summary>
-        /// Задает тайм ауты.
-        /// </summary>
-        /// <param name="pageLoadTimeouts"></param>
-        /// <param name="javaScriptTimeouts"></param>
-        public void setTimeouts(int pageLoadTimeouts, int javaScriptTimeouts)
-        {
-            this.pageLoadTimeouts = pageLoadTimeouts;
-            this.javaScriptTimeouts = javaScriptTimeouts;
-        }
-
-
-        /*
-        /// <summary>
-        /// Создает стандартную исконку с надписью.
-        /// </summary>
-        /// <param name="url"></param>
-        /// <param name="fileName"></param>
-        private void createErrorImage(string url,string fileName)
-        {
-        using ImageMagick;
-         var pathToBackgroundImage = "helloMan.jpg";
-            var pathToNewImage = "helloMan1.jpg";
-            var textToWrite = "Text";
-
-            // These settings will create a new caption
-            // which automatically resizes the text to best
-            // fit within the box.
-
-            var readSettings = new MagickReadSettings
-            {
-                Font = "Calibri",
-                FontPointsize=50,
-                TextGravity = Gravity.Center,
-                BackgroundColor = MagickColors.Transparent,
-                FillColor = MagickColors.Red, // -fill black
-                StrokeColor = MagickColors.Red,                
-                Height = 50, // height of text box
-                Width = 400 // width of text box
-            };
-
-            //Размер картинки 600х597
-
-            using (var image = new MagickImage(pathToBackgroundImage))
-            {
-                using (var caption = new MagickImage($"caption:{textToWrite}", readSettings))
-                {
-                    // Add the caption layer on top of the background image
-                    // at position 590,450
-                    image.Composite(caption, 20, 400, CompositeOperator.Over);
-
-                    image.Write(pathToNewImage);
-                }
-            }
-        }
-        */
+            Browser.Quit();
+        }              
 
     }
 }

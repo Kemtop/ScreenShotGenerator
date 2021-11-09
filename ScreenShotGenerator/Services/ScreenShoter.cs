@@ -299,10 +299,20 @@ namespace ScreenShotGenerator.Services
                 
                 try
                 {
+                    
                     //Создаем экземпляр обьекта для управления браузером.
                     BrowserControlLogic Bl = new BrowserControlLogic(
                         new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
-                        saveBrowserErrorDg, tmpDir) ;//new ImpBrowserControlChrome();
+                        saveBrowserErrorDg, tmpDir) ;
+                    
+                    /*
+                    //Создаем экземпляр обьекта для управления браузером.
+                    BrowserControlLogic Bl = new BrowserControlLogic(
+                        new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts,false,0),//Задаю таймауты загрузки.
+                        saveBrowserErrorDg, tmpDir);
+                    */
+
+
                     Bl.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
                     Bl.browserId=i + 1; //Ид браузера, что бы потоки как то можно отличать.
                

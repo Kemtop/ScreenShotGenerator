@@ -1,0 +1,33 @@
+
+
+ dnf install -y epel-release
+dnf config-manager --set-enabled PowerTools не сработало, ставим в ручную в файле
+/etc/yum.repos.d/CentOS-Stream-PowerTools.repo
+enabled=1
+
+dnf install httpd  
+После установки Apache запустите и включите автоматический запуск службы при загрузке системы.
+systemctl enable httpd
+systemctl start httpd
+Теперь пришло время установить Munin и Munin-Node.
+dnf -y install munin munin-node
+По умолчанию вышеуказанная установка создает следующие каталоги.
+
+/etc/munin/munin.conf : главный файл конфигурации Munin.
+/etc/cron.d/munin : cron-файл Munin.
+/etc/httpd/conf.d/munin.conf : файл конфигурации Munin Apache.
+/ var / log / munin : каталог журналов Munin.
+/ var / www / html / munin : веб-каталог Munin.
+/etc/munin/munin-node.conf : главный файл конфигурации узла Munin.
+/etc/munin/plugins.conf : файл конфигурации плагинов Munin.
+
+systemctl enable munin-node
+systemctl start munin-node
+
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --reload
+
+systemctl start munin
+systemctl enable munin
+
+netstat -ant

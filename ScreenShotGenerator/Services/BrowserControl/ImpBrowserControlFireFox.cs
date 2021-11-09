@@ -62,29 +62,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
 
-        /// <summary>
-        /// Читает конфигрурацию браузера.
-        /// </summary>
-        /// <param name="browserName"></param>
-        /// <returns></returns>
-        private Dictionary<string, object> readConfigBrowser(string browserName)
-        {
-            //Получаю конфигурацию.
-            IConfigurationRoot config_ = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: false)
-                 .Build();
-
-            List<IConfigurationSection> lines = config_.GetSection(browserName)
-                    .GetChildren().ToList();
-
-            Dictionary<string, object> Dic = new Dictionary<string, object>();
-            foreach (IConfigurationSection s in lines)
-            {
-                Dic[s.Key] = s.Value;
-            }
-
-            return Dic;
-        }
+      
 
         /// <summary>
         /// Считываю из appsettings.json опции браузера.
@@ -93,7 +71,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private FirefoxOptions createOptions()
         {
             //Читаю настройки браузера.
-            Dictionary<string, object> Dic = readConfigBrowser("Firefox");
+            Dictionary<string, object> Dic = ThingsForBrowser.readConfigBrowser("Firefox");
 
             FirefoxOptions options = new FirefoxOptions();
             //Должна быть установлена версия дравера 0.30.0.1 иначе работать не будет.
@@ -169,25 +147,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             return true;
         }
-
-
-        int takeScreen = 0;
-        private void stopLoadPage()
-        {
-
-            int max = pageLoadTimeouts * 100;
-            int cnt = 0;
-            while (takeScreen == 0)
-            {
-                if (cnt > max) break;
-                Task.Delay(10);
-                cnt++;
-            }
-            if (takeScreen == 1) return;
-            // actions.SendKeys(Keys.Escape);
-            //Log.Information("stopLoadPage");
-        }
-
+ 
 
         /// <summary>
         /// Создает скрин шот, в случае ошибок возвращает строку.
@@ -197,38 +157,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <returns></returns>
         public string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime)
         {
-
-
-            //Выполняю проверку живой ли браузер.
-            //Нормально не работает при тестах на виртуалке.
-            /*
-            try
-            {
-            //Если с объектом что то не то-думаю должно высыпаться. Но как проверить пока не ясно.
-            // string ttl = Browser.Title; Титл выбивает тайм аут 60сек.
-            string ttl = Browser.Url;
-
-            if (ttl==null)
-                {
-                    saveBrowserErrorDg((int)enumBrowserError.Debug, "Warning! Browser title is null. May be crash?",url,filename);
-                }
-
-            }
-            catch(Exception ex)
-            {
-                string str = "Exception to check title. Browser may be dead.: " + ex.Message;
-                saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename); 
-                return "Error 701";
-            }
-
-        */
-
+      
             //Измеряю затраченное время на открытие страницы.
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            takeScreen = 0;
-            Task t = new Task(() => stopLoadPage());
-            t.Start();
 
             try
             {
@@ -240,6 +172,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 string str = "Exception to GoToUrl: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
                 //Обработали исключение, сделали скрин шот, отправили пользователю.
+                if(ex.Message.Contains("is not a valid URL"))
+                {
+                    return "Error 703";
+                }
+
             }
 
             //Замеряю истекшее время.
@@ -252,7 +189,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                  //Обработка ошибки 404.
                      if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
            */
-            takeScreen = 1;
+
             Screenshot screenshot = null;
             try
             {
@@ -274,32 +211,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             try
             {
-                //Обрезка.
-                using (var stream = new MemoryStream())
-                {
-                    if (screenshot == null)
-                    {
-                        saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, "screenshot==null", url, filename);
-                    }
-
-                    using var image = Image.Load(screenshot.AsByteArray);
-                    image.Mutate(x => x
-                        //.AutoOrient() // this is the important thing that needed adding
-                        .Resize(new ResizeOptions
-                        {
-                            Mode = ResizeMode.Crop,
-                            Position = AnchorPositionMode.Center,
-                            Size = new SixLabors.ImageSharp.Size(1260, 965)
-                        })
-                        .BackgroundColor(SixLabors.ImageSharp.Color.White));
-
-
-                    string filePathFull = Path.Combine(curentDirectory, filePath);
-                    image.Save(filePathFull, new JpegEncoder() { Quality = 85 });
-
-
-
-                }
+                string filePathFull = Path.Combine(curentDirectory, filePath);
+                screenshot.SaveAsFile(filePathFull, ScreenshotImageFormat.Jpeg);
             }
             catch (Exception ex)
             {
