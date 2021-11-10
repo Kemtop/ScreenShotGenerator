@@ -11,7 +11,16 @@ namespace TestServices
             Console.WriteLine("Input test number and press enter.");
             Console.WriteLine();
             Console.WriteLine("1:Begin one thread request test.");
-           // Console.WriteLine("2:Multi thread.");
+            // Console.WriteLine("2:Multi thread.");
+
+            //Автоматически запускать тест.
+            if (args.Length != 0)
+            {
+                Tests test1 = new Tests();
+                test1.runTest1(args);
+            }
+                
+
 
             int res = 0;
             //Ждем пока пользователь введет число.
@@ -31,9 +40,11 @@ namespace TestServices
             }
 
             Tests test = new Tests();
+          
+
             switch(res)
             {
-                case 1: test.runTest1(); break;
+                case 1: test.runTest1(args); break;
 
                 default: break;
             }

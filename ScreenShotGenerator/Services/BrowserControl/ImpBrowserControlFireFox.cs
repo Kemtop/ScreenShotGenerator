@@ -120,6 +120,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             {
                 // Считываю из appsettings.json опции браузера.
                 FirefoxOptions options = createOptions();
+                 
 
                 //Отключить загрузку файлов.
                 //Путь к исполняемому файлу драйвера должен быть установлен системным свойством
@@ -134,8 +135,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Установка размера.
                 Browser.Manage().Window.Position = new System.Drawing.Point(0, 0); ;
                 Browser.Manage().Window.Size = new System.Drawing.Size(1280, 1060);
-
-
+                              
             }
             catch (Exception ex)
             {
@@ -145,6 +145,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
 
+            Log.Information("Run FireFox.");
             return true;
         }
  
@@ -206,12 +207,20 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
 
 
-
+             //Если все таки получиться отключить куки, тогда прийдеться использовать это.
             //driver.findElement(By.xpath("//a[@class='button allow']/span[text()='Allow cookies']")).click();
 
             try
             {
                 string filePathFull = Path.Combine(curentDirectory, filePath);
+                /*
+                //Selenium не перезаписывает файлы, по крайней мере версия драйвера для FireFox.
+                if (File.Exists(filePathFull))
+                {
+                    File.Delete(filePathFull);
+                    //Log.Information("Exist"+filePathFull);
+                }
+                  */          
                 screenshot.SaveAsFile(filePathFull, ScreenshotImageFormat.Jpeg);
             }
             catch (Exception ex)
@@ -222,6 +231,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return "Error 702";
             }
 
+
+        
             return null;
 
         }

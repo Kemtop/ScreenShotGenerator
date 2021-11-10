@@ -45,9 +45,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         /// Задача выборки данных из пула и их обработки.
         /// </summary>
-        // private Task workTask;
-        //private Thread workThread;
-        private Task workThread;
+         private Task workTask;
+
 
         /// <summary>
         /// Делегат для сохранения сведений об ошибках браузера.
@@ -85,10 +84,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             threadIsRun = true; //Задача может работать.
                                 //Запускаю задачу.
-            workThread = new Task(processPoolThread);
-            // workTask.Start();
-            //workThread = new Thread(processPoolThread);
-            workThread.Start();
+            workTask = new Task(processPoolThread);
+            workTask.Start();
         }
 
 
@@ -108,10 +105,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         {
             threadIsRun = false; //Остановка процесса обработки задач, если запущен.
             Browser.quit();
-            //Ждем завершения потока.
-            //workThread.Join();
-            //Task.WaitAny(workTask);
-            Task.WaitAny(workThread);
+            //Ждем завершения задачи.
+            Task.WaitAny(workTask);
         }
 
 
@@ -149,7 +144,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 {
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
-                    Thread.Sleep(1000);
+                    Thread.Sleep(300);
                     continue;
                 }
 
@@ -221,8 +216,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                             break;
                         }
-
-                        Task.Delay(300);
+                                                
                     }
 
 

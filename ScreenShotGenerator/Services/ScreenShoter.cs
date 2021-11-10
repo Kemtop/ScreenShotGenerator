@@ -308,7 +308,7 @@ namespace ScreenShotGenerator.Services
                     /*
                     //Создаем экземпляр обьекта для управления браузером.
                     BrowserControlLogic Bl = new BrowserControlLogic(
-                        new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts,false,0),//Задаю таймауты загрузки.
+                        new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts,true,i+1),//Задаю таймауты загрузки.
                         saveBrowserErrorDg, tmpDir);
                     */
 
@@ -824,6 +824,16 @@ namespace ScreenShotGenerator.Services
                             dbContext.screnshotCache.Where(x =>
                             x.timestamp.AddHours(clearCashInterval) < DateTime.Now)
                     );
+
+
+                //Очистка ошибок браузера, что бы не переполнялось.
+                Log.Information("Clear browser Error in Db.");
+                dbContext.browserErrors.RemoveRange(
+                        dbContext.browserErrors.Where(x =>
+                        x.created.AddHours(clearCashInterval) < DateTime.Now)
+                );
+
+
 
                 dbContext.SaveChanges();
                 Log.Information("End clear " + clearTbCnt.ToString() + " in db cache tables.");

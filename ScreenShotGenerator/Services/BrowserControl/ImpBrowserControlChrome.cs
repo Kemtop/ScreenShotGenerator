@@ -162,6 +162,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
 
+            Log.Information("Run Chrome.");
+
             return true;
         }
 

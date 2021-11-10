@@ -48,20 +48,25 @@ namespace TestServices
         /// <summary>
         /// Запускает однопоточный тест.
         /// </summary>
-        public void runTest1()
-        {          
-            int tasks = getFromUserTaskPerRequest(10);
-
+        public void runTest1(string[] args)
+        {
             //Данные хостов.
             Dictionary<int, string> hosts = new Dictionary<int, string>();
             hosts.Add(1, "https://localhost:44350");
             hosts.Add(2, "http://192.168.195.130:5000");
             hosts.Add(3, "http://localhost:5000");
 
-            //Спрашиваю у пользователя.
-            int hostKey=getFromUserНost(hosts);
-
-
+            int tasks = 10;
+            int hostKey = 3;
+            //Нет параметров.
+            if (args.Length==0)
+            {
+                //Спрашиваю пользователя.
+                tasks = getFromUserTaskPerRequest(10);
+                //Спрашиваю у пользователя.
+                hostKey = getFromUserНost(hosts);
+            }
+   
             Log.Information("Run Test1.");
             Console.WriteLine("Read file.");
             // prepareRundomFile(); //Ручная генерация.

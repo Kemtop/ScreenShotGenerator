@@ -1,0 +1,12 @@
+du ImgCache --размер папки. 125мб на 320файлов.
+lsof -i -P -n  показывает текущие соедиениеня.
+
+Включение репозитория PowerTools.(установка munin и др.)
+ dnf install -y epel-release
+dnf config-manager --set-enabled PowerTools не сработало, ставим в ручную в файле
+/etc/yum.repos.d/CentOS-Stream-PowerTools.repo
+enabled=1
+
+
+Запускаем тест в фоновом режиме
+nohup command > /dev/null 2>&1

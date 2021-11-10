@@ -235,7 +235,7 @@ namespace ScreenShotGenerator.Controllers
         {
 
             //Данные из таблицы. Первым в списке будут последние записи. В количестве что бы браузер не умер.
-            int selectLinesCnt = 100; //Количество выбранных записей.
+            int selectLinesCnt = 300; //Количество выбранных записей.
             List<mBrowserErrors> data = _dbContext.browserErrors.OrderByDescending(x=>x.Id).Take(selectLinesCnt).ToList();
 
             //Названия ошибок.
@@ -461,7 +461,7 @@ namespace ScreenShotGenerator.Controllers
         public  async Task<IActionResult> ShowTaskPool()
         {
             //Получаю информацию о состоянии пула. Последние last записей.
-             const int last = 50;
+             const int last = 300;
              List<mJobPool> tasks= await Task.Run(()=>_screenShoter.getPoolTasksInfo(last));
 
             //List<mBrowserErrors> data = _dbContext.browserErrors.OrderByDescending(x => x.Id).Take(selectLinesCnt).ToList();
