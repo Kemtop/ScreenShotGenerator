@@ -250,6 +250,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
 
+            /*
             //Проверяет не вернул ли браузер черную или белую картинку.
             int chkColorErr = imgOnlyBlackOrWhite(pathToFile);
             if (chkColorErr != 0)
@@ -257,6 +258,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 errMess = "Image contains only " + ((chkColorErr == 1) ? "white" : "black") + " pixels.";
                 return false;
             }
+            */
 
             return true;
         }

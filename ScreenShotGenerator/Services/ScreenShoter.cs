@@ -147,6 +147,9 @@ namespace ScreenShotGenerator.Services
             pageLoadTimeouts = parceIntCfgValue(configuration, "PageLoadTimeouts", 8);
             javaScriptTimeouts = parceIntCfgValue(configuration, "JavaScriptTimeouts", 8);
 
+            //Из конфига считываю имя хоста.
+            hostName=configuration["ScreenShoter:hostName"];
+
         }
 
 
@@ -299,18 +302,35 @@ namespace ScreenShotGenerator.Services
                 
                 try
                 {
+                    //Отладка.
+                    bool FireFox = true;
+                    BrowserControlLogic Bl = null;
+
+                    if (FireFox)
+                    {
+                        /*
+                        //Создаем экземпляр обьекта для управления браузером.
+                         Bl = new BrowserControlLogic(
+                            new ImpBrowserControlFireFoxTabs(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
+                            saveBrowserErrorDg, tmpDir);
+                        */
+                        
+                         Bl = new BrowserControlLogic(
+                            new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
+                            saveBrowserErrorDg, tmpDir);
+                        
+
+                    }
+                    else
+                    {
+                        //Создаем экземпляр обьекта для управления браузером.
+                        Bl = new BrowserControlLogic(
+                            new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts, true, i + 1),//Задаю таймауты загрузки.
+                            saveBrowserErrorDg, tmpDir);
+                    }
+                  
                     
-                    //Создаем экземпляр обьекта для управления браузером.
-                    BrowserControlLogic Bl = new BrowserControlLogic(
-                        new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
-                        saveBrowserErrorDg, tmpDir) ;
-                    
-                    /*
-                    //Создаем экземпляр обьекта для управления браузером.
-                    BrowserControlLogic Bl = new BrowserControlLogic(
-                        new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts,true,i+1),//Задаю таймауты загрузки.
-                        saveBrowserErrorDg, tmpDir);
-                    */
+                                    
 
 
                     Bl.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
@@ -375,7 +395,7 @@ namespace ScreenShotGenerator.Services
         public List<mUserJson> runJob(string[] urls, string userIP)
         {
             //Получение корневого url запроса, если уже его не получили.
-            getHostName();
+           // getHostName();
 
             //Список для быстрого мониторинга отправленных задач.
             //Так как содержит ссылки на задачи.

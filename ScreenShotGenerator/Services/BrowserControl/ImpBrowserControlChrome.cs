@@ -3,6 +3,7 @@ using ImageMagick;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Interactions;
+using OpenQA.Selenium.Support.UI;
 using ScreenShotGenerator.Services.Models;
 using ScreenShotGenerator.Services.ScreenShoterPools;
 using Serilog;
@@ -167,7 +168,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
             return true;
         }
 
-     
         /// <summary>
         /// Создает скрин шот, в случае ошибок возвращает строку.
         /// </summary>
@@ -176,7 +176,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <returns></returns>
         public string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
         {
+          
 
+            String firstPageId = "";
 
             //Выполняю проверку живой ли браузер.
             //Нормально не работает при тестах на виртуалке.
@@ -210,12 +212,15 @@ namespace ScreenShotGenerator.Services.BrowserControl
             try
             {
                 //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
-                Browser.Navigate().GoToUrl(url);
+               Browser.Navigate().GoToUrl(url);
+              
+                
             }
             catch(Exception ex)
             {
                 string str = "Exception to GoToUrl: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
+               
                 //Обработали исключение, сделали скрин шот, отправили пользователю.
             }
         
@@ -240,10 +245,13 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 {
                     string str = "Exception to GetScreenshot: " + ex1.Message;
                     saveBrowserErrorDg((int)enumBrowserError.GetScreenshotError, str, url, filename);
-                    //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
-                    // String standartErrorImg = "noLoadPageErr.jpg";
-                    // return copyFile(standartErrorImg, filename); ;
-                }
+          
+
+
+                //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
+                // String standartErrorImg = "noLoadPageErr.jpg";
+                // return copyFile(standartErrorImg, filename); ;
+            }
 
      
 
@@ -260,8 +268,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Сохраняю картинку.
                 ThingsForBrowser.cutAndSave(screenshot.AsByteArray,filePathFull);
 
-            
-            }catch(Exception ex)
+            }
+            catch(Exception ex)
             {
                 //Добавить стандартную картинку.
                 String str= "Exception in metod takeScreenShot where save screenshot: " + ex.Message;

@@ -1,9 +1,9 @@
-﻿using ImageMagick;
-using Microsoft.Extensions.Configuration;
+﻿
+using ImageMagick;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
-using OpenQA.Selenium.Firefox;
 using OpenQA.Selenium.Interactions;
+using OpenQA.Selenium.Support.UI;
 using ScreenShotGenerator.Services.Models;
 using ScreenShotGenerator.Services.ScreenShoterPools;
 using Serilog;
@@ -23,9 +23,10 @@ using System.Threading.Tasks;
 namespace ScreenShotGenerator.Services.BrowserControl
 {
     /// <summary>
-    /// Реализация управления браузером FireFox.
+    /// Реализация управления браузером Chrome. 
+    /// Открытие закрытие вкладки. Демо для тестов.
     /// </summary>
-    public class ImpBrowserControlFireFox : IBrowserControl
+    public class ImpBrowserControlChromeTabs : IBrowserControl
     {
         /// <summary>
         /// Объект для управления браузером(драйвер).
@@ -33,48 +34,55 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private IWebDriver Browser;
 
         /// <summary>
-        /// Тайм аут загрузки страницы.
-        /// </summary>
-        private int pageLoadTimeouts { get; set; }
-        /// <summary>
-        /// Тайм аут загрузки скрипта.
-        /// </summary>
-        private int javaScriptTimeouts { get; set; }
-
-
-        /// <summary>
         /// Делегат для сохранения сведений об ошибках браузера.
         /// </summary>
         public saveBrowserError saveBrowserErrorDg { get; set; }
+
+        /// <summary>
+        /// Тайм аут загрузки страницы.
+        /// </summary>
+        private int pageLoadTimeouts;
+        /// <summary>
+        /// Тайм аут загрузки скрипта.
+        /// </summary>
+        private int javaScriptTimeouts;
 
         /// <summary>
         /// Путь к текущей папке.
         /// </summary>
         private string curentDirectory;
 
+        /// <summary>
+        /// Включить подробное логирование.
+        /// </summary>
+        private bool enableLog;
 
-        public ImpBrowserControlFireFox(int pageLoadTimeouts, int javaScriptTimeouts)
+        /// <summary>
+        /// Идентификатор браузера, нужен только для логирования.
+        /// </summary>
+        private int browserId;
+        public ImpBrowserControlChromeTabs(int pageLoadTimeouts, int javaScriptTimeouts, bool enableLog, int browserId)
         {
             //Путь к рабочей директории приложения.
             curentDirectory = Directory.GetCurrentDirectory();
             this.pageLoadTimeouts = pageLoadTimeouts;
             this.javaScriptTimeouts = javaScriptTimeouts;
+            this.enableLog = enableLog;
+            this.browserId = browserId;
         }
 
 
-      
 
         /// <summary>
         /// Считываю из appsettings.json опции браузера.
         /// </summary>
         /// <returns></returns>
-        private FirefoxOptions createOptions()
+        private ChromeOptions createOptions()
         {
             //Читаю настройки браузера.
-            Dictionary<string, object> Dic = ThingsForBrowser.readConfigBrowser("Firefox");
+            Dictionary<string, object> Dic = ThingsForBrowser.readConfigBrowser("Chrome");
 
-            FirefoxOptions options = new FirefoxOptions();
-            //Должна быть установлена версия дравера 0.30.0.1 иначе работать не будет.
+            ChromeOptions chromeOptions = new ChromeOptions();
             bool boolValue;
             int intValue;
             float floatValue;
@@ -84,31 +92,34 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Увы но не смотря на типы в json все значения приходят с типом string.
                 if (Boolean.TryParse(l.Value.ToString(), out boolValue))
                 {
-                    options.SetPreference(l.Key, boolValue);
+                    chromeOptions.AddUserProfilePreference(l.Key, boolValue);
                     continue;
                 }
 
                 if (Int32.TryParse(l.Value.ToString(), out intValue))
                 {
-                    options.SetPreference(l.Key, intValue);
+                    chromeOptions.AddUserProfilePreference(l.Key, intValue);
                     continue;
                 }
 
                 if (float.TryParse(l.Value.ToString(), out floatValue))
                 {
-                    options.SetPreference(l.Key, floatValue);
+                    chromeOptions.AddUserProfilePreference(l.Key, floatValue);
                     continue;
                 }
 
 
                 //И ни то и не другое,значит точно строка.
-                options.SetPreference(l.Key, l.Value.ToString());
+                //Приходит аргрумент. Начинается с --.
+                if (l.Key[0] == '-')
+                    chromeOptions.AddArgument(l.Key);
+                else
+                    chromeOptions.AddUserProfilePreference(l.Key, l.Value);
 
             }
 
-            return options;
+            return chromeOptions;
         }
-
 
 
         /// <summary>
@@ -119,22 +130,21 @@ namespace ScreenShotGenerator.Services.BrowserControl
             try
             {
                 // Считываю из appsettings.json опции браузера.
-                FirefoxOptions options = createOptions();
+                ChromeOptions chromeOptions = createOptions();
 
-                options.AddArgument("start-maximized");
-                options.AddArgument("disable-infobars");
-                options.AddArgument("--disable-extensions");
-                options.AddArgument("--no-sandbox");
-                options.AddArgument("--disable-application-cache");
-                options.AddArgument("--disable-gpu");
-                options.AddArgument("--disable-dev-shm-usage");
-
-
-
-                //Отключить загрузку файлов.
-                //Путь к исполняемому файлу драйвера должен быть установлен системным свойством
-                Browser = new FirefoxDriver(options);
-
+                //Включаем логирование, так как сыпяться ошибки.
+                if (enableLog)
+                {
+                    var service = ChromeDriverService.CreateDefaultService();
+                    service.LogPath = "chromedriver_" + browserId.ToString() + ".log";
+                    service.EnableVerboseLogging = true;
+                    Browser = new OpenQA.Selenium.Chrome.ChromeDriver(service, chromeOptions,
+                  TimeSpan.FromSeconds(8));
+                }
+                else
+                {
+                    Browser = new OpenQA.Selenium.Chrome.ChromeDriver(chromeOptions);
+                }
 
                 //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
                 //к тайм ауту взаимодействия с драйвером. Исключаем такую ситуацию.
@@ -144,7 +154,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Установка размера.
                 Browser.Manage().Window.Position = new System.Drawing.Point(0, 0); ;
                 Browser.Manage().Window.Size = new System.Drawing.Size(1280, 1060);
-                              
+
             }
             catch (Exception ex)
             {
@@ -154,41 +164,95 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
 
-            Log.Information("Run FireFox.");
+            Log.Information("Run Chrome.");
+
             return true;
         }
- 
 
-     
+
+        int cntWindow = 0;
+
+        private async void xdel()
+        {
+            await Task.Delay(3000);
+        }
+
         /// <summary>
         /// Создает скрин шот, в случае ошибок возвращает строку.
         /// </summary>
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        public  string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime)
+        public string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime)
         {
-      
+
+
+            String firstPageId = "";
+
+            //Выполняю проверку живой ли браузер.
+            //Нормально не работает при тестах на виртуалке.
+            /*
+            try
+            {
+            //Если с объектом что то не то-думаю должно высыпаться. Но как проверить пока не ясно.
+            // string ttl = Browser.Title; Титл выбивает тайм аут 60сек.
+            string ttl = Browser.Url;
+
+            if (ttl==null)
+                {
+                    saveBrowserErrorDg((int)enumBrowserError.Debug, "Warning! Browser title is null. May be crash?",url,filename);
+                }
+
+            }
+            catch(Exception ex)
+            {
+                string str = "Exception to check title. Browser may be dead.: " + ex.Message;
+                saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename); 
+                return "Error 701";
+            }
+
+        */
+
             //Измеряю затраченное время на открытие страницы.
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
+
             try
             {
                 //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
-                Browser.Navigate().GoToUrl(url);
+                // Browser.Navigate().GoToUrl(url);
+                IJavaScriptExecutor js = (IJavaScriptExecutor)Browser;
+                //WebDriverWait wait = new WebDriverWait(Browser, TimeSpan.FromSeconds(8));
+
+                js.ExecuteScript("window.open('" + url + "','_blank" + cntWindow.ToString() + "');");
+
+                //wait.Until(Browser => ((IJavaScriptExecutor)Browser).
+                //ExecuteScript("window.open('" + url + "','_blank" + cntWindow.ToString() + "');"));
+
+
+                List<string> br = Browser.WindowHandles.ToList();
+                firstPageId = br[0];
+
+                //wait.Until(js.ExecuteScript("window.open('" + url + "','_blank" + cntWindow.ToString() + "'"));//.Equals("complete"));
+
+                //js.ExecuteScript("window.open('" + url + "','_blank"+cntWindow.ToString()+"');");
+                Browser.SwitchTo().Window(br[1]);
+                //Browser.SwitchTo().Window("_blank" + cntWindow.ToString());//(Browser.WindowHandles. Last());
+
+
+                //wait.Until(ExpectedConditions.visibilityOfElementLocated(By.Id("outerDiv")));
+
+                cntWindow++;
+                xdel();
 
             }
             catch (Exception ex)
             {
                 string str = "Exception to GoToUrl: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
-                //Обработали исключение, сделали скрин шот, отправили пользователю.
-                if(ex.Message.Contains("is not a valid URL"))
-                {
-                    return "Error 703";
-                }
 
+                //Обработали исключение, сделали скрин шот, отправили пользователю.
             }
 
             //Замеряю истекшее время.
@@ -212,20 +276,30 @@ namespace ScreenShotGenerator.Services.BrowserControl
             {
                 string str = "Exception to GetScreenshot: " + ex1.Message;
                 saveBrowserErrorDg((int)enumBrowserError.GetScreenshotError, str, url, filename);
+
+
+
                 //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
                 // String standartErrorImg = "noLoadPageErr.jpg";
                 // return copyFile(standartErrorImg, filename); ;
             }
 
 
-             //Если все таки получиться отключить куки, тогда прийдеться использовать это.
+
             //driver.findElement(By.xpath("//a[@class='button allow']/span[text()='Allow cookies']")).click();
 
             try
             {
-                string filePathFull = Path.Combine(curentDirectory, filePath);    
-                screenshot.SaveAsFile(filePathFull, ScreenshotImageFormat.Jpeg);
-                screenshot = null;
+                if (screenshot == null)
+                {
+                    saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, "screenshot==null", url, filename);
+                }
+
+                string filePathFull = Path.Combine(curentDirectory, filePath);
+                //Сохраняю картинку.
+                ThingsForBrowser.cutAndSave(screenshot.AsByteArray, filePathFull);
+                Browser.Close();
+                Browser.SwitchTo().Window(firstPageId);
 
             }
             catch (Exception ex)
@@ -236,8 +310,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return "Error 702";
             }
 
-
-        
             return null;
 
         }
@@ -249,4 +321,3 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
     }
 }
-

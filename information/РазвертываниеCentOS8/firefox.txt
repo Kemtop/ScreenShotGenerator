@@ -1,0 +1,49 @@
+//Репозиторий https://ftp.mozilla.org/pub/firefox/releases/
+
+Удаляем старый.
+unlink /usr/bin/firefox
+mv /usr/bin/firefox /usr/bin/firefox_bak
+удаляем старый /usr/local/firefox
+
+
+cd /usr/local
+wget https://ftp.mozilla.org/pub/firefox/releases/52.0.2/linux-x86_64/ru/firefox-52.0.2.tar.bz2
+tar xvjf firefox-52.0.2.tar.bz2
+ ln -s /usr/local/firefox/firefox /usr/bin/firefox
+ Удаляем архив из /usr/local
+ rm /usr/local/firefox/
+ 
+ 
+ wget https://ftp.mozilla.org/pub/firefox/releases/93.0/linux-x86_64/ru/firefox-93.0.tar.bz2
+ tar xvjf firefox-93.0.tar.bz2
+ 
+ 
+ 
+ 
+ 
+  "browser.privatebrowsing.autostart": true,
+    "network.http.use-cache": false,
+    "app.update.auto.migrated": false,
+    "dom.webnotifications.enabled": false,
+    "browser.download.manager.showAlertOnComplete": false,
+    "browser.safebrowsing.downloads.enabled": false,
+    "javascript.enabled": true,
+    "browser.cache.memory.enable": true,
+    "browser.cache.disk.enable": false,
+    "browser.cache.offline.enable": false,
+    "browser.cache.disk.smart_size.enabled": false,
+    "browser.cache.disk_cache_ssl": false,
+	"dom.caches.enabled": false,
+	"extensions.getAddons.cache.enabled": false,
+	"network.ssl_tokens_cache_enabled": false,
+	"privacy.clearsitedata.cache.enabled": false,
+	"media.mediasource.webm.audio.enabled": false,
+	"dom.webaudio.enabled": false,
+	"dom.audioworklet.enabled": false,
+	"image.cache.timeweight": 10,
+    "app.update.service.enabled": false,
+	"browser.aboutConfig.showWarning": false,
+	"dom.push.enabled": false,
+	"browser.sessionhistory.max_total_viewers": 0, 
+	"config.trim_on_minimize": true,
+	"browser.cache.memory.max_entry_size": 64
