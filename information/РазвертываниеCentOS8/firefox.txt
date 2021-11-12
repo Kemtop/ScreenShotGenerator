@@ -11,17 +11,35 @@ wget https://ftp.mozilla.org/pub/firefox/releases/52.0.2/linux-x86_64/ru/firefox
 tar xvjf firefox-52.0.2.tar.bz2
  ln -s /usr/local/firefox/firefox /usr/bin/firefox
  Удаляем архив из /usr/local
- rm /usr/local/firefox/
+ rm -rf /usr/local/firefox/
  
  
  wget https://ftp.mozilla.org/pub/firefox/releases/93.0/linux-x86_64/ru/firefox-93.0.tar.bz2
  tar xvjf firefox-93.0.tar.bz2
  
+  wget https://ftp.mozilla.org/pub/firefox/releases/93.0/linux-i686/ru/firefox-93.0.tar.bz2
  
  
+  wget https://ftp.mozilla.org/pub/firefox/releases/80.0/linux-x86_64/ru/firefox-80.0.tar.bz2
+ tar xvjf firefox-80.0.tar.bz2
+ 
+ ---------------Умерла после 2х часов.
+  wget https://ftp.mozilla.org/pub/firefox/releases/70.0/linux-x86_64/ru/firefox-70.0.tar.bz2
+   tar xvjf firefox-70.0.tar.bz2
  
  
-  "browser.privatebrowsing.autostart": true,
+  wget https://ftp.mozilla.org/pub/firefox/releases/60.0/linux-x86_64/ru/firefox-60.0.tar.bz2
+  tar xvjf firefox-60.0.tar.bz2
+ 
+ https://ftp.mozilla.org/pub/firefox/releases/59.0/linux-x86_64/ru/firefox-59.0.tar.bz2
+   tar xvjf firefox-59.0.tar.bz2
+ ------Не работает.
+ https://ftp.mozilla.org/pub/firefox/releases/56.0/linux-x86_64/ru/firefox-56.0.tar.bz2
+ 
+  rm -rf /usr/local/firefox/
+ 
+ 
+    "browser.privatebrowsing.autostart": true,
     "network.http.use-cache": false,
     "app.update.auto.migrated": false,
     "dom.webnotifications.enabled": false,

@@ -1,40 +1,67 @@
 ﻿@using ScreenShotGenerator.Entities;
 @model List<mBrowserErrors>
-<h3>Журнал сообщений об ошибках.</h3><br>
-Расшифровка столбца level:<br>
-@{ 
-    foreach(KeyValuePair<int,string> l in ViewBag.nameLevels)
+<h3>Журнал сообщений об ошибках.</h3>
+<br>
+Расшифровка столбца level:
+<br>
+@{
+    foreach (KeyValuePair<int, string> l in ViewBag.nameLevels)
     {
-        @(l.Value+"="+l.Key) <br>
+        @(l.Value+"="+l.Key)
+        <br>
     }
 }
 <h4>Выбрано @ViewBag.selectLinesCnt записей</h4>
-    <div>
-        <table border="1">
-            <tr>
-                <td>Id</td>
-                <td>Level</td>
-                <td>Сообщение</td>
-                <td>URL</td>
-                <td>Файл</td>
-                <td>Время</td>
-            </tr>
-            @{
-                foreach (mBrowserErrors l in Model)
-                {
-                        <tr>
-                            <td>@l.Id</td>
-                            <td>@l.level</td>
-                            <td>@l.message</td>
-                            <td> <a href="@l.url">@l.url</a></td>
-                            <td> 
-                                <a href="/imgCache/@l.filename">
-                                <img src='/imgCache/@l.filename' width="50%" height="50%">  
-                                </a>
-                             </td> 
-                            <td>@l.created</td>
-                        </tr>
-                }
+<div>
+    <table border="1">
+        <tr>
+            <td>Id</td>
+            <td>Level</td>
+            <td width="20%">Сообщение</td>
+            <td>URL</td>
+            <td>Файл</td>
+            <td>Время</td>
+        </tr>
+        @{
+            foreach (mBrowserErrors l in Model)
+            {
+                <tr>
+                    <td>@l.Id</td>
+                    <td>@l.level</td>
+                    <td>
+                        @if (l.message.Length > 50)
+                        {
+                            //Делаем строку читабельной.
+                            string str = "";
+                            int pos = 0;
+                            int str_len = l.message.Length - 1;
+                            while (pos < str_len)
+                            {
+                                if ((pos + 47) < str_len)
+                                    str += l.message.Substring(pos, 47) + "   ";
+                                else
+                                    str += l.message.Substring(pos, str_len-pos);
+                                pos += 47;
+                            }
+                            l.message = str;
+                        }
+                        @l.message
+                    </td>
+                    <td>
+                        <a href="@l.url">
+                            @if (l.url.Length > 40) { l.url = l.url.Substring(0, 40) + "..."; }
+                            @l.url
+                        </a>
+                    </td>
+                    <td>
+                        <a href="/imgCache/@l.filename">
+                            <img src='/imgCache/@l.filename' width="50%" height="50%">
+                        </a>
+                    </td>
+
+                    <td>@l.created</td>
+                </tr>
             }
-        </table>
-    </div>
+        }
+    </table>
+</div>

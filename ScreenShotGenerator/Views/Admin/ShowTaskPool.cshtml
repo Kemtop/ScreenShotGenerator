@@ -31,7 +31,10 @@
                     <td>@l.status</td>
                     <td>@l.browserId</td>
                     <td>@l.wastedTime</td>
-                    <td> <a href="@l.url">@l.url</a></td>
+                    <td>                                 
+                    <a href="@l.url">
+                        @if (l.url.Length > 40) { l.url=l.url.Substring(0,40) + "..."; }
+                        @l.url </a></td>
                     <td>
                         <a href="/imgCache/@l.fileName">
                             <img src='/imgCache/@l.fileName' width="50%" height="50%">

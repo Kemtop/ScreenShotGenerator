@@ -91,6 +91,10 @@ namespace ScreenShotGenerator.perfomenceService
         {
             Log.Information("Run service monitoring perfomaces.");
 
+            Log.Information("Monitoring disable by programmer!");
+            int y = 10; //Временная отладка.
+            if (y == 10) return;
+
             while (!cancellationToken.IsCancellationRequested)
             {                
                 await Task.Delay(intervalMonitoring*1000);

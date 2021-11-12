@@ -168,7 +168,27 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <returns></returns>
         public  string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime)
         {
-      
+            //Переход на пустую страницу для исключения ситуации когда новый сайт по особенному долго
+            //грузиться и в итоге получается скрин старого сайта.
+            try
+            {
+                //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
+                Browser.Navigate().GoToUrl("http://localhost:5000/blankPage.html");
+
+            }
+            catch (Exception ex)
+            {
+                string str = "Exception to go blankPage.html: " + ex.Message;
+                saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
+                //Обработали исключение, сделали скрин шот, отправили пользователю.
+                if (ex.Message.Contains("Can't open blank page."))
+                {
+                    return "Error 704.Can't open blank page.";
+                }
+
+            }
+
+
             //Измеряю затраченное время на открытие страницы.
             Stopwatch sw = new Stopwatch();
             sw.Start();
