@@ -38,16 +38,6 @@ namespace ScreenShotGenerator.Controllers
         [AllowAnonymous]
         public IActionResult Index(string []url, string allowedReferer)
         {
-            //string url1
-            // System.Diagnostics.Debug.WriteLine("fdssssssssssss");
-            // System.Diagnostics.Debug.WriteLine("p="+url[0]);
-            //?url[0]=https://google.ru&url[1]=https://google.com&url[2]=https://yandex.com&allowedReferer=1
-
-
-            //bool useEnc = false;
-           //if (useEncoding != null) useEnc = true;
-
-          
             //Запрещено пользоваться посторонним лицам.
             if (allowedReferer==null)
             {              
@@ -61,7 +51,7 @@ namespace ScreenShotGenerator.Controllers
                 IPAddress userIp = HttpContextAccessor.HttpContext.Connection.RemoteIpAddress;
                 string strIP = userIp.ToString();
                 //url нормально понимают преобразованные символы в запросе типа %23 и т.д.
-                List<mUserJson> ret =_screenShoter.runJob(url,strIP);
+                List<mUserJson> ret =_screenShoter.runJob(url,strIP, HttpContextAccessor.HttpContext.TraceIdentifier);
                 return Json(ret);
             }
                      

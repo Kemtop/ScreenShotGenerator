@@ -26,6 +26,12 @@ namespace ScreenShotGenerator.Services
      public delegate void saveBrowserError(int level,string message,string url,string filename);
 
     /// <summary>
+    /// Делегат для события появления новой задачи для браузеров.
+    /// </summary>
+    public delegate void hasNewJobForBrowsers();
+
+
+    /// <summary>
     ///Логика скриншоттера.
     /// </summary>
     public class ScreenShoter : IScreenShoter
@@ -116,6 +122,16 @@ namespace ScreenShotGenerator.Services
         int javaScriptTimeouts;
 
 
+        /// <summary>
+        /// Список объектов для ожидания завершения браузером выполнения задачи.
+        /// </summary>
+        List<waiterEvent> waiterEventList;
+
+        /// <summary>
+        /// Событие появление новой работы для браузера.
+        /// </summary>
+        private event hasNewJobForBrowsers newJobForBrowser;
+
         public ScreenShoter(
             IHttpContextAccessor context,
             IServiceScopeFactory scopeFactory,
@@ -125,8 +141,10 @@ namespace ScreenShotGenerator.Services
             this.scopeFactory = scopeFactory;
 
             poolTask = new poolTasks();
-           
-            Cache = new cacheRam();
+            waiterEventList = new List<waiterEvent>();
+
+
+             Cache = new cacheRam();
             poolBrowserControls = new List<BrowserControlLogic>();
 
             //Чтение настроек сервиса.
@@ -201,7 +219,7 @@ namespace ScreenShotGenerator.Services
                 //Если запущен процесс чистки кеша. Жду окончания.
                 if(runClearCache)
                 {
-                    Task.Delay(300);
+                    Thread.Sleep(300);
                     continue;
                 }
 
@@ -212,7 +230,7 @@ namespace ScreenShotGenerator.Services
                 }
 
                 //Жду пока ресурс разблокируеться.
-                Task.Delay(300);
+                Thread.Sleep(300);
             }
 
             return null;
@@ -308,18 +326,11 @@ namespace ScreenShotGenerator.Services
 
                     if (FireFox)
                     {
-                        /*
-                        //Создаем экземпляр обьекта для управления браузером.
-                         Bl = new BrowserControlLogic(
-                            new ImpBrowserControlFireFoxTabs(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
-                            saveBrowserErrorDg, tmpDir);
-                        */
-                        
+                       
                          Bl = new BrowserControlLogic(
                             new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
                             saveBrowserErrorDg, tmpDir);
                         
-
                     }
                     else
                     {
@@ -338,7 +349,11 @@ namespace ScreenShotGenerator.Services
                
                     if (!Bl.startBrowser())//Запустить браузер. Выходим если не смог.
                         break;
-                                        
+
+                    //Назначаем обработчик завершения задачи.
+                    Bl.finishedJob += OnBrowserTaskCompleted;
+                    newJobForBrowser+= Bl.OnNewJob; //Подписываем все браузеры на информирование о новой задаче.
+
                     Bl.processPool(ref poolTask, ref lockPoolTask); //Запустить обработку пула задач.
                     poolBrowserControls.Add(Bl);
                 }
@@ -349,6 +364,38 @@ namespace ScreenShotGenerator.Services
             }
 
         }
+
+        /// <summary>
+        /// Обработчик события по завершению каким либо браузером задачи(сделал скриншот).
+        /// </summary>
+        /// <param name="requestId"></param>
+        private void OnBrowserTaskCompleted(string requestId)
+        {
+            //Поиск требуемого ид http запроса и сброс ожидания.
+            foreach(var w in waiterEventList)
+            {
+                if (w.requestId == requestId)
+                {
+                    w.signalizator.Set();
+                    break;
+                }
+            }
+        }
+
+
+   
+        /// <summary>
+        /// Увеличивает значение счетчика идентификатора задач.
+        /// </summary>
+        private void incElementId()
+        {
+            //Исключение ошибки переполнения, если сервис будет очень долго работать. -10 просто так.
+            if (elementId == int.MaxValue - 10)
+                elementId = 0;//Обнуляю.
+            else
+                elementId++;
+        }
+
 
 
         /// <summary>
@@ -392,7 +439,7 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         /// <param name="url"></param>
         /// <returns></returns>
-        public List<mUserJson> runJob(string[] urls, string userIP)
+        public List<mUserJson> runJob(string[] urls, string userIP,string conUUID)
         {
             //Получение корневого url запроса, если уже его не получили.
            // getHostName();
@@ -400,6 +447,7 @@ namespace ScreenShotGenerator.Services
             //Список для быстрого мониторинга отправленных задач.
             //Так как содержит ссылки на задачи.
             List<mJobPool> jb = new List<mJobPool>();
+
 
             //Прохожу по списку урл.          
             foreach (string url in urls)
@@ -415,11 +463,8 @@ namespace ScreenShotGenerator.Services
                     t.url = url;
                     t.id = elementId; //Идентификатор элемента для возможности его сортировки.
 
-                    //Исключение ошибки переполнения, если сервис будет очень долго работать. -10 просто так.
-                    if (elementId == int.MaxValue - 10)
-                        elementId = 0;//Обнуляю.
-                    else
-                        elementId++;
+                    //Увеличивает значение счетчика идентификатора задач.
+                    incElementId(); 
 
                     waitUnlockClearManPoolTask(); //Если осуществляется очистка пула-ждем.
                                                   //Не переполнен ли пул задач?
@@ -435,20 +480,33 @@ namespace ScreenShotGenerator.Services
                     t = cashValue;
                 }
 
+                //Все задачи в пакете будут иметь одинаковый идентификатор запроса.
+                t.requestId = conUUID;
+                
                 jb.Add(t);
             }
 
+           
 
             int taskCnt = jb.Count; //Количество задач.
 
             int cntComplate = 0; //Количество выполненных задач.
             var stopwatch = new Stopwatch();//Меряем сколько времени прошло.
-          
+
+            //Ожидатель завершения какой либо задачи для данного запроса.
+            waiterEvent wE = new waiterEvent();
+            wE.requestId=conUUID;
+            waiterEventList.Add(wE); //Добавляю в общий "пул" ожидальщиков.
+
+            //Генерируем событие-Информируем все браузеры что есть новая задача.
+            newJobForBrowser();
+
             //Жду пока браузеры не обработают задачи. Или не остановят процесс.
             while (!_cancellationToken.IsCancellationRequested)
             {
                 stopwatch.Start();
-
+                wE.signalizator.WaitOne(); //Ждем пока браузер выполнит задачу из этого запроса.
+                
                 //Считаю количество выполненных задач или задач с ошибками.
                 cntComplate = 0;
                 foreach (mJobPool t in jb)
@@ -474,12 +532,19 @@ namespace ScreenShotGenerator.Services
                     return generateAnswer(ref jb, userIP);
                 }
 
-               
+                //Все задачи не выполнены.  Если один браузер выполняет одну задачу-его нужно разбудить.
+                newJobForBrowser();//Генерируем событие-Информируем все браузеры что есть новая задача.
             }
+
+            //Для данного типа это обязательно согласно документации.
+            wE.signalizator.Dispose();
 
             return null;
 
         }
+
+
+
 
 
 
@@ -582,7 +647,7 @@ namespace ScreenShotGenerator.Services
                 }
 
                 //Если ресурс заблокирован, ждем.
-                Task.Delay(1000);
+                Thread.Sleep(1000);
             }
 
         }
@@ -788,7 +853,7 @@ namespace ScreenShotGenerator.Services
                     return;
                 }
 
-                Task.Delay(500);
+                Thread.Sleep(500);
             }
 
         }
@@ -875,7 +940,7 @@ namespace ScreenShotGenerator.Services
                 }
 
                 //Жду пока ресурс разблокируеться.
-                Task.Delay(300);
+                Thread.Sleep(300);
             }                  
 
         }

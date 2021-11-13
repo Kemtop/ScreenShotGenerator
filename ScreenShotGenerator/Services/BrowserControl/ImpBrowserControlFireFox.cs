@@ -61,8 +61,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
             this.javaScriptTimeouts = javaScriptTimeouts;
         }
 
+   
 
-      
 
         /// <summary>
         /// Считываю из appsettings.json опции браузера.

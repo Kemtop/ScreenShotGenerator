@@ -72,6 +72,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
 
 
+
+
         /// <summary>
         /// Считываю из appsettings.json опции браузера.
         /// </summary>
@@ -177,9 +179,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
         public string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
         {
           
-
-            String firstPageId = "";
-
             //Выполняю проверку живой ли браузер.
             //Нормально не работает при тестах на виртуалке.
             /*

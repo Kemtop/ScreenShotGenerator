@@ -19,6 +19,13 @@ using System.Threading.Tasks;
 namespace ScreenShotGenerator.Services.BrowserControl
 {
     /// <summary>
+    /// Делегат для события по завершению создания скриншота.
+    /// </summary>
+    /// <returns></returns>
+    public delegate void BrowserEndJobOnPage(string uuid);
+
+
+    /// <summary>
     /// Логика управления браузером.
     /// </summary>
     public class BrowserControlLogic
@@ -62,6 +69,17 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Идентификатор браузера.
         /// </summary>
         public int browserId { get; set; }
+
+
+        /// <summary>
+        /// Событие по завершению выполнения задачи.
+        /// </summary>
+        public event BrowserEndJobOnPage finishedJob;
+
+        /// <summary>
+        /// Объект ожидания события появления новой задачи.
+        /// </summary>
+        private AutoResetEvent waiter = new AutoResetEvent(false);
 
         public BrowserControlLogic(IBrowserControl Browser_, saveBrowserError saveBrowserErrorDg_, string tmpDir)
         {
@@ -109,6 +127,15 @@ namespace ScreenShotGenerator.Services.BrowserControl
             Task.WaitAny(workTask);
         }
 
+        /// <summary>
+        /// Обработчик события появления новой работы в ScreenShoter.
+        /// </summary>
+        public void OnNewJob()
+        {
+            waiter.Set(); //Будем логику обработки новой задачи.
+        }
+
+
 
         /// <summary>
         /// Проверяет есть ли в пуле новые задачи, выполняет их.
@@ -119,6 +146,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
             {
                 //Список задач из пула.
                 List<mJobPool> data = null;
+
+                waiter.WaitOne();//Жду появления новой задачи.
+
 
                 //Блокирую пул для других потоков.
                 lock (lockPoolTasks)
@@ -144,7 +174,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 {
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
-                    Thread.Sleep(300);
+                  
                     continue;
                 }
 
@@ -213,14 +243,19 @@ namespace ScreenShotGenerator.Services.BrowserControl
                                 saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, lastError, p.url, p.fileName);
                             }
 
+                            //Формирую событие по окончанию выполнения задачи.
+                            finishedJob(p.requestId); //Передаю идентификатор http запроса.
 
                             break;
                         }
                                                 
                     }
 
+                   
 
                 }
+
+               
             }
         }
 

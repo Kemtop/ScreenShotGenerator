@@ -35,7 +35,7 @@ namespace ScreenShotGenerator.Services
         /// <param name="url"></param>
         /// <param name="userIP"></param>
         /// <returns></returns>
-        List<mUserJson> runJob(string[] url, string userIP);
+        List<mUserJson> runJob(string[] url, string userIP, string conUUID);
 
         /// <summary>
         /// Возвращает настройки сервиса.

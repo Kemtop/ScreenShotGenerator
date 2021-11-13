@@ -12,6 +12,11 @@ namespace ScreenShotGenerator.Services.ScreenShoterPools
     {
         //Фактически номер в списке.
         public int id;
+
+        /// <summary>
+        /// Идентификатор http запроса.
+        /// </summary>
+        public string requestId;
         public string url { get; set; }
         //Статус выполнения задачи. 0-ни кто о задаче не знает, 1-принята в обработку. 2-ошибка, 3-выполнена.
         public int status { get; set; }

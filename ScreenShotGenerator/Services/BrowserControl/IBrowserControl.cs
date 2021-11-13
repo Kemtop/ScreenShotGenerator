@@ -1,5 +1,6 @@
 ﻿namespace ScreenShotGenerator.Services.BrowserControl
 {
+ 
     /// <summary>
     /// Интерфейс для управления браузерами через Selenium.
     /// </summary>

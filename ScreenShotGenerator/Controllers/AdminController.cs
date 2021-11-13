@@ -144,7 +144,7 @@ namespace ScreenShotGenerator.Controllers
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPost]
-        public async Task<IActionResult> Index(SystemSettingModel model)
+        public IActionResult Index(SystemSettingModel model)
         {
             if (model == null) return View(model);
 

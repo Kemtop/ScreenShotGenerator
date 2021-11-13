@@ -72,7 +72,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
 
-
         /// <summary>
         /// Считываю из appsettings.json опции браузера.
         /// </summary>
