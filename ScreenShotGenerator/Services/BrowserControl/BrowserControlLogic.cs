@@ -122,6 +122,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         public void stopProcess()
         {
             threadIsRun = false; //Остановка процесса обработки задач, если запущен.
+            waiter.Set(); //Что бы вечно не ждала система завершения задачи.
+            finishedJob("");//Что бы вечно не ждала система завершения задачи.
             Browser.quit();
             //Ждем завершения задачи.
             Task.WaitAny(workTask);

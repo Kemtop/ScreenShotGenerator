@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ namespace ScreenShotGenerator.Services.ScreenShoterPools
     public class poolTasks
     {      
         List<mJobPool> pool = new List<mJobPool>();
+        //BlockingCollection<mJobPool> pool = new BlockingCollection<mJobPool>();
 
         //Добавить значение в пул.
         public void add(mJobPool job)

@@ -305,6 +305,7 @@ namespace ScreenShotGenerator.Services
         public Task stopService(CancellationToken cancellationToken)
         {
             stopBrowserPool();
+           
             return Task.CompletedTask;
         }
 
@@ -497,7 +498,7 @@ namespace ScreenShotGenerator.Services
             waiterEvent wE = new waiterEvent();
             wE.requestId=conUUID;
             waiterEventList.Add(wE); //Добавляю в общий "пул" ожидальщиков.
-
+            
             //Генерируем событие-Информируем все браузеры что есть новая задача.
             newJobForBrowser();
 
