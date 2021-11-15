@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -70,6 +71,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public int browserId { get; set; }
 
+        /// <summary>
+        /// Количество сделанных скрин шоттов.
+        /// </summary>
+        private int countScreenShots;
+
+        
 
         /// <summary>
         /// Событие по завершению выполнения задачи.
@@ -180,23 +187,28 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     continue;
                 }
 
+                //Превышен лимит.
+                if(countScreenShots>10000)
+                {
+                    //Перезапуск браузера.
+                    Browser.quit();
+                    countScreenShots = 0;
+                    Browser.runBrowser();
+                }
+
 
                 foreach (mJobPool p in data)
                 {
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
 
-                    //Проверка урл на пустоту.
-                    if (String.IsNullOrEmpty(p.url))
+                    //Проверяет валидность указанного URL. Пуст, возможно ли преобразование ДНС.
+                    if (!checkValidUrl(p))
                     {
-                        string errMsg = "Error:Empty url!";
-                        p.status = (int)enumTaskStatus.Error;
-                        p.fileName = errMsg;
-                        //Сохраняю логи в БД.
-                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
+                        //Формирую событие по окончанию выполнения задачи.
+                        finishedJob(p.requestId); //Передаю идентификатор http запроса.
                         continue;
                     }
-
 
                     String lastError = null; //Последнее сообщение об ошибке, если есть.
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
@@ -205,9 +217,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
 
                     //Cоздание скриншота.
-                    // Log.Information("take "+p.url+";Browser="+browserId.ToString());
-                    string err = Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime);
-                    //Log.Information("end " + p.url + ";Browser=" + browserId.ToString());
+                    // Log.Information("take "+p.url+";Browser="+browserId.ToString());                  
+                    string err = Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime,p.imageSize,
+                        ref p.fileSize);
+                    //Log.Information("size="+outSize.ToString());
 
                     //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
                     if (!threadIsRun) return;
@@ -236,7 +249,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         {
                             //Были ли ошибки?
                             if (allGood)
+                            {
                                 p.status = (int)enumTaskStatus.End; //Все хорошо.
+                            }                                
                             else
                             {
                                 p.status = (int)enumTaskStatus.Error;
@@ -253,13 +268,51 @@ namespace ScreenShotGenerator.Services.BrowserControl
                                                 
                     }
 
-                   
+                        countScreenShots++;
 
                 }
 
                
             }
         }
+
+        /// <summary>
+        /// Проверяет валидность указанного URL.
+        /// </summary>
+        /// <returns></returns>
+        private bool checkValidUrl(mJobPool p)
+        {
+            //Проверка урл на пустоту.
+            if (String.IsNullOrEmpty(p.url))
+            {
+                string errMsg = "Error:Empty url!";
+                p.status = (int)enumTaskStatus.End;
+                p.fileName = UrlErrorImg.badUrl;
+                //Сохраняю логи в БД.
+                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
+                return false;
+            }
+
+
+            try
+            {
+                Uri uri = new Uri(p.url);
+                IPAddress[] addresses = Dns.GetHostAddresses(uri.Host);
+            }
+            catch
+            {
+                //Проблемы с адресом.
+                string errMsg = "Error:dnsNotFound!";
+                p.status = (int)enumTaskStatus.End;
+                p.fileName = UrlErrorImg.badUrl;
+                //Сохраняю логи в БД.
+                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
+                return false;
+            }
+
+            return true;
+        }
+
 
         /// <summary>
         /// Проверяет итоговый файл на существование, на размер, и на заполнение только белым или только черным.

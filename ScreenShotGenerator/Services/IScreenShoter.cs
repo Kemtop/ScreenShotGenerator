@@ -74,5 +74,12 @@ namespace ScreenShotGenerator.Services
         /// <param name="lastCnt"></param>
         /// <returns></returns>
         List<mCacheRam> getCacheItems(int lastCnt);
+
+
+        /// <summary>
+        /// Возвращает размер файлов во временной папке в Мб.
+        /// </summary>
+        /// <returns></returns>
+        int getTmpDirSize();
     }
 }

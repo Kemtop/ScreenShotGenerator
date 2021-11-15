@@ -166,7 +166,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        public  string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime)
+        public  string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime,
+            ImageSize imgSize, ref UInt32 outSize)
         {
             //Переход на пустую страницу для исключения ситуации когда новый сайт по особенному долго
             //грузиться и в итоге получается скрин старого сайта.
@@ -243,9 +244,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             try
             {
-                string filePathFull = Path.Combine(curentDirectory, filePath);    
-                screenshot.SaveAsFile(filePathFull, ScreenshotImageFormat.Jpeg);
-                screenshot = null;
+
+                string filePathFull = Path.Combine(curentDirectory, filePath);
+                ThingsForBrowser.reduceImage(screenshot.AsByteArray, imgSize, filePathFull,ref outSize);
+                //screenshot.SaveAsFile(filePathFull, ScreenshotImageFormat.Jpeg);
+                //screenshot = null;
 
             }
             catch (Exception ex)

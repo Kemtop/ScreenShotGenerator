@@ -29,5 +29,9 @@ namespace ScreenShotGenerator.Services.Models
         /// </summary>
         public float wastedTime;
 
+        /// <summary>
+        /// Размер файла в Кб.
+        /// </summary>
+        public UInt32 fileSize;
     }
 }

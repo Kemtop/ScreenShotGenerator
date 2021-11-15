@@ -57,3 +57,5 @@ http://46.254.21.204:5000/?url[0]=https://mail.ru&allowedReferer=1
 ------------Проверка состояния работы настроек firefox .
 http://46.254.21.204:5000/?url[0]=about:config&allowedReferer=1
 http://46.254.21.204:5000/imgCache/e43648ef7c80e1a6aa2fc5e3182ed187.jpg
+
+http://до.зэт.рф

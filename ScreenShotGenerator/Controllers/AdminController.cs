@@ -51,8 +51,9 @@ namespace ScreenShotGenerator.Controllers
         {
             //Получаю сведения о настройках сервиса.
             SystemSettingModel model = _screenShoter.getSettings();
+            model.cacheFilesSize = _screenShoter.getTmpDirSize();// Возвращает размер файлов во временной папке в Мб.
             model.InfoMessage = "Сейчас " + DateTime.Now.ToString("hh:mm:ss dd.MM.yyyy");
-
+            
             return View(model);
         }
 

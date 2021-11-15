@@ -49,5 +49,10 @@ namespace ScreenShotGenerator.Models
         /// </summary>
         public int curentElementsInProcessCnt { get; set; }
 
+        /// <summary>
+        /// Общий размер файлов во временной папке.
+        /// </summary>
+        public int cacheFilesSize { get; set; }
+
     }
 }

@@ -29,6 +29,7 @@ namespace ScreenShotGenerator.Services.ScreenShoterPools
             m.fileName = job.fileName;
             m.timestamp = job.timestamp;
             m.wastedTime = job.wastedTime;
+            m.fileSize = job.fileSize;
             cache.Add(m);
         }
 

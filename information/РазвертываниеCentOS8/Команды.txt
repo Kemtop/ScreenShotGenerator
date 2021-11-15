@@ -16,3 +16,26 @@ f и поставить звеждочку на против.
 
 Чистка картинок
   rm -rf ./imgCache/*
+  
+
+Установка Edge
+dnf install ./rpm архив  
+
+Пид процесса top -p `pgrep "java"`
+top -p `pgrep "Web"`
+
+pgrep Web
+
+top | grep Web
+
+top -p PID
+top -p 243670
+
+ps -p 243670 v
+cat /proc/243670/smaps
+/proc/${243670}/smaps
+
+243670/status
+grep VmSwap /proc/243670/status
+Выводит все процессы использующие swap
+(echo "COMM PID SWAP"; for file in /proc/*/status ; do awk '/^Pid|VmSwap|Name/{printf $2 " " $3}END{ print ""}' $file; done | grep kB | grep -wv "0 kB" | sort -k 3 -n -r) | column -t

@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Advanced;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 using System;
@@ -66,5 +68,39 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             }
         }
+
+        /// <summary>
+        /// Изменить размер изображения и сохранить его в файл.
+        /// </summary>
+        public static void reduceImage(byte[] screen,ImageSize sz, string filePathFull,ref UInt32 outSize)
+        {
+
+            using (var image = Image.Load(screen))
+            {
+                image.Mutate(x => x
+                        //.AutoOrient() // this is the important thing that needed adding
+                        .Resize(new ResizeOptions
+                        {
+                            Mode = ResizeMode.Stretch,
+                            Position = AnchorPositionMode.Center,
+                            Size = new SixLabors.ImageSharp.Size(sz.width, sz.height)
+                        }));
+                // .BackgroundColor(SixLabors.ImageSharp.Color.White));
+
+                IImageEncoder imageEncoder = new JpegEncoder() { Quality = 85 };
+
+                image.Save(filePathFull, imageEncoder);
+                using (var ms = new MemoryStream())
+                {
+                    image.Save(ms, imageEncoder);
+                    long len=ms.Length;//bytes; 
+                    outSize = (UInt32)len / 1024;
+                }
+                 
+            }
+
+
+        }
+
     }
 }

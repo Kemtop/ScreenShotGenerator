@@ -176,7 +176,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        public string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime)
+        public string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime,
+            ImageSize imgSize,ref UInt32 outSize)
         {
           
             //Выполняю проверку живой ли браузер.

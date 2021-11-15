@@ -1,4 +1,6 @@
-﻿namespace ScreenShotGenerator.Services.BrowserControl
+﻿using System;
+
+namespace ScreenShotGenerator.Services.BrowserControl
 {
  
     /// <summary>
@@ -27,7 +29,7 @@
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime);
+        string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime, ImageSize imgSize, ref UInt32 outSize);
 
     }
 }

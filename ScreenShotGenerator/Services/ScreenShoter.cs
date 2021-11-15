@@ -115,17 +115,26 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Тайм аут загрузки страницы браузером.
         /// </summary>
-        int pageLoadTimeouts;
+        private int pageLoadTimeouts;
         /// <summary>
         /// Тайм аут загрузки скриптов браузером.
         /// </summary>
-        int javaScriptTimeouts;
+        private int javaScriptTimeouts;
 
+        /// <summary>
+        /// Общий размер выходных файлов, находящихся во временой папке.
+        /// </summary>
+        private UInt64 outFilesSize;
+
+        /// <summary>
+        /// Максимальный размер временной папки с файлами,в Кб.
+        /// </summary>
+        private UInt64 caсheSpaceLimit = 10485760;//Кб
 
         /// <summary>
         /// Список объектов для ожидания завершения браузером выполнения задачи.
         /// </summary>
-        List<waiterEvent> waiterEventList;
+        private List<waiterEvent> waiterEventList;
 
         /// <summary>
         /// Событие появление новой работы для браузера.
@@ -310,6 +319,16 @@ namespace ScreenShotGenerator.Services
         }
 
         /// <summary>
+        /// Возвращает размер файлов во временной папке в Мб.
+        /// </summary>
+        /// <returns></returns>
+        public int getTmpDirSize()
+        {
+            return (int)outFilesSize / 1024;
+        }
+
+
+        /// <summary>
         /// Создаю пул браузеров.
         /// </summary>
         private void createBrowserPool()
@@ -322,16 +341,23 @@ namespace ScreenShotGenerator.Services
                 try
                 {
                     //Отладка.
-                    bool FireFox = true;
+                     bool FireFox = true;
+                   // bool FireFox = false;
                     BrowserControlLogic Bl = null;
 
                     if (FireFox)
                     {
+                        /*
+                          Он тоже болен болезнью хрома.
+                       Bl = new BrowserControlLogic(
+                       new ImpBrowserControlEdge(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
+                       saveBrowserErrorDg, tmpDir);
+                        */
+
+                        Bl = new BrowserControlLogic(
+                           new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
+                           saveBrowserErrorDg, tmpDir);
                        
-                         Bl = new BrowserControlLogic(
-                            new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
-                            saveBrowserErrorDg, tmpDir);
-                        
                     }
                     else
                     {
@@ -463,6 +489,9 @@ namespace ScreenShotGenerator.Services
                     t = new mJobPool(); //Новая задача.
                     t.url = url;
                     t.id = elementId; //Идентификатор элемента для возможности его сортировки.
+                    t.imageSize = new ImageSize();
+                    t.imageSize.width = 600;
+                    t.imageSize.height = 400;
 
                     //Увеличивает значение счетчика идентификатора задач.
                     incElementId(); 
@@ -486,13 +515,15 @@ namespace ScreenShotGenerator.Services
                 
                 jb.Add(t);
             }
-
-           
+                       
 
             int taskCnt = jb.Count; //Количество задач.
-
-            int cntComplate = 0; //Количество выполненных задач.
             var stopwatch = new Stopwatch();//Меряем сколько времени прошло.
+
+            //Не находятся ли все задачи в кэш? и все уже выполнено..
+            //Считаю количество выполненных задач или задач с ошибками.
+            List<mUserJson> answer = checkComplatedJobs(jb, taskCnt, userIP);
+            if (answer != null) return answer; //Все задачи выполнены, возвращаю результат.
 
             //Ожидатель завершения какой либо задачи для данного запроса.
             waiterEvent wE = new waiterEvent();
@@ -506,22 +537,12 @@ namespace ScreenShotGenerator.Services
             while (!_cancellationToken.IsCancellationRequested)
             {
                 stopwatch.Start();
+                
                 wE.signalizator.WaitOne(); //Ждем пока браузер выполнит задачу из этого запроса.
                 
                 //Считаю количество выполненных задач или задач с ошибками.
-                cntComplate = 0;
-                foreach (mJobPool t in jb)
-                {
-                    if ((t.status == (int)enumTaskStatus.End) || (t.status == (int)enumTaskStatus.Error))
-                        cntComplate++;
-                }
-
-
-                //Все задачи выполнены.
-                if (taskCnt == cntComplate)
-                {
-                    return generateAnswer(ref jb,userIP);
-                }
+                List<mUserJson> answ=checkComplatedJobs(jb, taskCnt, userIP);
+                if (answ != null) return answ; //Все задачи выполнены, возвращаю результат.
 
                 //Измеряем сколько обрабатываются задачи.
                 stopwatch.Stop();
@@ -544,6 +565,33 @@ namespace ScreenShotGenerator.Services
 
         }
 
+        /// <summary>
+        /// Проверяет выполнены ли все задачи. Если выполнены возвращает набор данных.
+        /// </summary>
+        /// <param name="jb"></param>
+        /// <param name="taskCnt"></param>
+        /// <param name="userIP"></param>
+        /// <returns></returns>
+        private List<mUserJson> checkComplatedJobs(List<mJobPool> jb,int taskCnt, string userIP)
+        {
+
+            //Считаю количество выполненных задач или задач с ошибками.
+            int cntComplate = 0;
+            foreach (mJobPool t in jb)
+            {
+                if ((t.status == (int)enumTaskStatus.End) || (t.status == (int)enumTaskStatus.Error))
+                    cntComplate++;
+            }
+
+
+            //Все задачи выполнены.
+            if (taskCnt == cntComplate)
+            {
+                return generateAnswer(ref jb, userIP);
+            }
+
+            return null;
+        }
 
 
 
@@ -668,9 +716,12 @@ namespace ScreenShotGenerator.Services
               
                 foreach (mJobPool j in jb)
                 {
+                    //Возвращается не стандартная ошибка. Файлы стандартных ошибок не добавляем в кэш.
+                    if (j.fileName == UrlErrorImg.badUrl) continue;
+
                     //Объект еще не находиться в кеши и обработан успешно.
                     if ((j.inCash == false) && (j.status == 3))
-                    {
+                    {                   
                         //Что бы не было явных пересечений при обработки одинаковых урл.
                         j.inCash = true; //Говорим что объект кеширован.
 
@@ -685,16 +736,33 @@ namespace ScreenShotGenerator.Services
 
                         db.screnshotCache.Add(line);
                         needSaveDb = true;
+                        //Общий размер всех файлов.
+                        outFilesSize += j.fileSize;
                     }
                 }
 
                 //Необходимо сохранить значения.
                 if (needSaveDb)
                 {
-                  db.SaveChanges();                  
+                    try
+                    {
+                        db.SaveChanges();
+                    }
+                    catch(Exception ex)
+                    {
+                        Log.Error("Error save Changes Db " +ex.Message);
+                    }
+                                 
                 }
+                                
             }
-            
+
+
+            //Общий размер всех файлов превысил лимит,нужно чистить каталог.
+            if(outFilesSize>caсheSpaceLimit)
+            {
+                Log.Information("Exceeded max dir limit. Begin clear dir.");
+            }
         }
 
 
@@ -968,7 +1036,15 @@ namespace ScreenShotGenerator.Services
                 m.created = DateTime.Now;
 
                 db.browserErrors.Add(m);
-                db.SaveChanges();
+               
+                try
+                {
+                    db.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Error save Changes Db " + ex.Message);
+                }
             }
         }
 

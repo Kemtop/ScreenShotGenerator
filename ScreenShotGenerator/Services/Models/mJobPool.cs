@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ScreenShotGenerator.Services.BrowserControl;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -45,5 +46,15 @@ namespace ScreenShotGenerator.Services.ScreenShoterPools
         /// Время затраченное на создание скрин шотта.
         /// </summary>
         public float wastedTime;
+
+        /// <summary>
+        /// Размер картинки.
+        /// </summary>
+        public ImageSize imageSize;
+
+        /// <summary>
+        /// Размер файла в Кб.
+        /// </summary>
+        public UInt32 fileSize;
     }
 }
