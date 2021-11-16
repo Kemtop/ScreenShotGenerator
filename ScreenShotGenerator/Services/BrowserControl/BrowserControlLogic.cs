@@ -296,7 +296,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             try
             {
+                //string u = Uri.UnescapeDataString(p.url);
                 Uri uri = new Uri(p.url);
+                string t= uri.DnsSafeHost;
                 IPAddress[] addresses = Dns.GetHostAddresses(uri.Host);
             }
             catch

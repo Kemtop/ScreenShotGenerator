@@ -98,6 +98,34 @@ namespace ScreenShotGenerator.Services.ScreenShoterPools
         {
             return cache.OrderByDescending(x => x.id).Take(cnt).ToList();
         }
+
+        /// <summary>
+        /// Возвращает начальные элементы размер которых не превышает указанный.
+        /// Т.е. первые файлы, общий размер которых не более указанного значения.
+        /// </summary>
+        /// <returns></returns>
+        public List<mCacheRam> getFirstElementsSomeSize(UInt64 size)
+        {
+            UInt64 cnt = 0;
+            IEnumerable<mCacheRam> tb = cache.OrderBy(x => x.id).
+                   TakeWhile(x => {
+                       cnt += x.fileSize;
+                       //Выбрать начальные элементы сумма которых меньше заданного размера.
+                       return size > cnt;
+                   });
+
+            return tb.ToList();
+        }
+
+        /// <summary>
+        /// Удаляет требуемые записи.
+        /// </summary>
+        /// <param name="range"></param>
+        public void clearInterval(List<mCacheRam> items)
+        {
+             cache.RemoveAll(x=>items.Any(y=>y.id==x.id));
+        }
+
     }
 }
 

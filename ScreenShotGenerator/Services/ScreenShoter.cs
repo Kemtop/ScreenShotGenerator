@@ -122,14 +122,19 @@ namespace ScreenShotGenerator.Services
         private int javaScriptTimeouts;
 
         /// <summary>
-        /// Общий размер выходных файлов, находящихся во временой папке.
+        /// Счетчик размера выходных файлов, находящихся во временой папке.
         /// </summary>
         private UInt64 outFilesSize;
 
         /// <summary>
         /// Максимальный размер временной папки с файлами,в Кб.
         /// </summary>
-        private UInt64 caсheSpaceLimit = 10485760;//Кб
+        private UInt32 caсheSpaceLimit;
+
+        /// <summary>
+        /// Размер файлов которые должны остаться после достижения лимита и принудительной чистки кэша.
+        /// </summary>
+        private UInt32 cacheRemainingSize;
 
         /// <summary>
         /// Список объектов для ожидания завершения браузером выполнения задачи.
@@ -176,6 +181,14 @@ namespace ScreenShotGenerator.Services
 
             //Из конфига считываю имя хоста.
             hostName=configuration["ScreenShoter:hostName"];
+
+            //Максимальный размер папки кэша.
+            int tmpDirLimit = parceIntCfgValue(configuration, "tmpDirLimit", 10240);
+            caсheSpaceLimit = ((UInt32)tmpDirLimit)*1024; //в Кб.
+
+            //Общий размер оставшихся файлов после принудительной чистки кеша.
+            int tmpDirRemainingSize= parceIntCfgValue(configuration, "tmpDirRemainingSize", 1024);
+            cacheRemainingSize = ((UInt32)tmpDirRemainingSize) * 1024;
 
         }
 
@@ -341,8 +354,8 @@ namespace ScreenShotGenerator.Services
                 try
                 {
                     //Отладка.
-                     bool FireFox = true;
-                   // bool FireFox = false;
+                    // bool FireFox = true;
+                    bool FireFox = false;
                     BrowserControlLogic Bl = null;
 
                     if (FireFox)
@@ -762,7 +775,10 @@ namespace ScreenShotGenerator.Services
             if(outFilesSize>caсheSpaceLimit)
             {
                 Log.Information("Exceeded max dir limit. Begin clear dir.");
+                clearCacheForcibly(cacheRemainingSize);
             }
+
+          
         }
 
 
@@ -786,6 +802,7 @@ namespace ScreenShotGenerator.Services
                     l.timestamp = ct.timestamp;
                     l.url = ct.url;
                     l.wastedTime = ct.wastedTime;
+                    l.fileSize = (uint)ct.size;
                     Cache.add(l);
                 }
             }
@@ -1013,6 +1030,70 @@ namespace ScreenShotGenerator.Services
             }                  
 
         }
+
+
+        /// <summary>
+        /// Принудительно очищаем кэш, оставляем только последние(самые новые) remainingSize записей. 
+        /// </summary>
+        private void clearCacheForcibly(UInt32 remainingSize)
+        {
+            Log.Information("Forcibly clear cache after limit tmp dir.");
+
+            using (var scope = scopeFactory.CreateScope())
+            {
+                ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                //Вычисляем размер удаляемых файлов.
+                UInt64 delSize = outFilesSize - ((UInt64)remainingSize);
+
+                //Удаление файлов на диске.
+                Log.Information("Forcibly delete from disk and Db after limit. Will be clean "+delSize.ToString()+
+                    "Kb.");
+
+                //Выбираю элементы которые нужно удалить.
+                List<mCacheRam> delRam=Cache.getFirstElementsSomeSize(delSize);
+                int itemCount = delRam.Count; //Количество удаляемых записей.
+
+                //Удаление из памяти.
+                while (!_cancellationToken.IsCancellationRequested)
+                {
+                    lock (lockCachePool)
+                    {
+                        Cache.clearInterval(delRam);
+                        break;
+                    }
+
+                    //Жду пока ресурс разблокируеться.
+                    Thread.Sleep(300);
+                }
+
+
+
+                foreach (mCacheRam t in delRam)
+                {
+                    try
+                    {
+                        var path = Path.Combine(@"wwwroot/imgCache/", t.fileName);
+                        File.Delete(path);
+                        //Удаляем из БД.
+                        dbContext.screnshotCache.Remove(dbContext.screnshotCache.
+                            Where(x => x.fileName == t.fileName).First());
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error("Error where delete " + t.fileName + " from disk. Exception:" + ex.Message);
+                    }
+
+                    
+                }
+
+                dbContext.SaveChanges();
+                Log.Information("End Forcibly delete. Remove "+ itemCount.ToString()+" items.");
+
+            }      
+
+        }
+
 
         /// <summary>
         /// В таблицу browserError добавляю сообщение об ошибках браузера.

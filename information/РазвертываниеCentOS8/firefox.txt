@@ -65,3 +65,6 @@ tar xvjf firefox-52.0.2.tar.bz2
 	"browser.sessionhistory.max_total_viewers": 0, 
 	"config.trim_on_minimize": true,
 	"browser.cache.memory.max_entry_size": 64
+	
+	
+	Ошибка http://sp.bvf.ru/

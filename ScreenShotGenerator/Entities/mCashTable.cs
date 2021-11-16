@@ -21,6 +21,11 @@ namespace ScreenShotGenerator.Entities
         /// </summary>
         public string fileName { get; set; }
 
+        /// <summary>
+        /// Размер файла в Кб.
+        /// </summary>
+        public int size { get; set; }
+
 
         /// <summary>
         /// Время затраченное на создание скрин шотта.
