@@ -19,19 +19,6 @@ using System.Diagnostics;
 namespace ScreenShotGenerator.Services
 {
     /// <summary>
-    /// Делегат для сохранения ошибок браузера.
-    /// </summary>
-    /// <param name="level"></param>
-    /// <param name="message"></param>
-     public delegate void saveBrowserError(int level,string message,string url,string filename);
-
-    /// <summary>
-    /// Делегат для события появления новой задачи для браузеров.
-    /// </summary>
-    public delegate void hasNewJobForBrowsers();
-
-
-    /// <summary>
     ///Логика скриншоттера.
     /// </summary>
     public class ScreenShoter : IScreenShoter
@@ -67,8 +54,10 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         cacheRam Cache;
 
-        //Пул объектов для управления браузерами.
-        List<BrowserControlLogic> poolBrowserControls;
+        /// <summary>
+        /// Пул браузеров.
+        /// </summary>
+        BrowserPool browserPool;
 
         int poolBrowserSize = 1; //Количество запущенных браузеров.
         int browserTasksPerThread = 5; //Количество задач из пула которые браузер обрабатывает за раз.
@@ -109,7 +98,7 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Делегат для записи ошибок браузера в БД.
         /// </summary>
-        saveBrowserError saveBrowserErrorDg;
+        //saveBrowserError saveBrowserErrorDg;
 
 
         /// <summary>
@@ -136,16 +125,14 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private UInt32 cacheRemainingSize;
 
+        private bool beginForciblyCleanCashe;
+
         /// <summary>
         /// Список объектов для ожидания завершения браузером выполнения задачи.
         /// </summary>
         private List<waiterEvent> waiterEventList;
 
-        /// <summary>
-        /// Событие появление новой работы для браузера.
-        /// </summary>
-        private event hasNewJobForBrowsers newJobForBrowser;
-
+      
         public ScreenShoter(
             IHttpContextAccessor context,
             IServiceScopeFactory scopeFactory,
@@ -159,8 +146,8 @@ namespace ScreenShotGenerator.Services
 
 
              Cache = new cacheRam();
-            poolBrowserControls = new List<BrowserControlLogic>();
 
+            
             //Чтение настроек сервиса.
             readSettingsFromDb();
 
@@ -173,7 +160,7 @@ namespace ScreenShotGenerator.Services
             createTimers(configuration); //Настраивает таймеры.
 
             //Делегат для записи ошибок.
-            saveBrowserErrorDg = saveBrowserError;
+            //saveBrowserErrorDg = saveBrowserError;
 
             //Читаю таймауты из конфига.
             pageLoadTimeouts = parceIntCfgValue(configuration, "PageLoadTimeouts", 8);
@@ -190,6 +177,11 @@ namespace ScreenShotGenerator.Services
             int tmpDirRemainingSize= parceIntCfgValue(configuration, "tmpDirRemainingSize", 1024);
             cacheRemainingSize = ((UInt32)tmpDirRemainingSize) * 1024;
 
+            browserPool = new BrowserPool(tmpDir, ref poolTask, ref lockPoolTask,
+                OnBrowserTaskCompleted);
+            browserPool.saveBrowserErrorDg = saveBrowserError;
+            browserPool.javaScriptTimeouts = javaScriptTimeouts;
+            browserPool.pageLoadTimeouts = pageLoadTimeouts;
         }
 
 
@@ -281,7 +273,8 @@ namespace ScreenShotGenerator.Services
         private void runTasks()
         {
             Log.Information("Running browser control service...");
-            createBrowserPool();//Создаем пул браузеров.
+            browserPool.createPool(poolBrowserSize);//Создаем пул браузеров.
+
             Log.Information("Browser control service it running.");
 
         }
@@ -309,18 +302,7 @@ namespace ScreenShotGenerator.Services
         private void stopBrowserPool()
         {
             Log.Information("Stoping services...");
-
-            int i = 1;
-            foreach (BrowserControlLogic bl in poolBrowserControls)
-            {
-                Log.Information("Close browser..." + i.ToString());
-                bl.stopProcess();
-                i++;
-            }
-
-            //Очищаю пулл.
-            poolBrowserControls.Clear();
-
+            browserPool.clearPool();
             Log.Information("StopService.");
         }
 
@@ -341,76 +323,15 @@ namespace ScreenShotGenerator.Services
         }
 
 
-        /// <summary>
-        /// Создаю пул браузеров.
-        /// </summary>
-        private void createBrowserPool()
-        {
-            //Создаю пул браузеров.
-            for (int i = 0; i < poolBrowserSize; i++)
-            {
-                Log.Information("Create browser " + (i + 1).ToString()); //Вывод информации.
-                
-                try
-                {
-                    //Отладка.
-                    // bool FireFox = true;
-                    bool FireFox = false;
-                    BrowserControlLogic Bl = null;
-
-                    if (FireFox)
-                    {
-                        /*
-                          Он тоже болен болезнью хрома.
-                       Bl = new BrowserControlLogic(
-                       new ImpBrowserControlEdge(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
-                       saveBrowserErrorDg, tmpDir);
-                        */
-
-                        Bl = new BrowserControlLogic(
-                           new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
-                           saveBrowserErrorDg, tmpDir);
-                       
-                    }
-                    else
-                    {
-                        //Создаем экземпляр обьекта для управления браузером.
-                        Bl = new BrowserControlLogic(
-                            new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts, true, i + 1),//Задаю таймауты загрузки.
-                            saveBrowserErrorDg, tmpDir);
-                    }
-                  
-                    
-                                    
-
-
-                    Bl.tasksPerThread = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
-                    Bl.browserId=i + 1; //Ид браузера, что бы потоки как то можно отличать.
-               
-                    if (!Bl.startBrowser())//Запустить браузер. Выходим если не смог.
-                        break;
-
-                    //Назначаем обработчик завершения задачи.
-                    Bl.finishedJob += OnBrowserTaskCompleted;
-                    newJobForBrowser+= Bl.OnNewJob; //Подписываем все браузеры на информирование о новой задаче.
-
-                    Bl.processPool(ref poolTask, ref lockPoolTask); //Запустить обработку пула задач.
-                    poolBrowserControls.Add(Bl);
-                }
-                catch (Exception ex)
-                {
-                    Log.Error("Exception in [createBrowserPool]:" + ex.Message);
-                }
-            }
-
-        }
+   
 
         /// <summary>
         /// Обработчик события по завершению каким либо браузером задачи(сделал скриншот).
         /// </summary>
         /// <param name="requestId"></param>
         private void OnBrowserTaskCompleted(string requestId)
-        {
+        {           
+
             //Поиск требуемого ид http запроса и сброс ожидания.
             foreach(var w in waiterEventList)
             {
@@ -544,7 +465,7 @@ namespace ScreenShotGenerator.Services
             waiterEventList.Add(wE); //Добавляю в общий "пул" ожидальщиков.
             
             //Генерируем событие-Информируем все браузеры что есть новая задача.
-            newJobForBrowser();
+            browserPool.eventNewJobForBrowser();
 
             //Жду пока браузеры не обработают задачи. Или не остановят процесс.
             while (!_cancellationToken.IsCancellationRequested)
@@ -568,7 +489,7 @@ namespace ScreenShotGenerator.Services
                 }
 
                 //Все задачи не выполнены.  Если один браузер выполняет одну задачу-его нужно разбудить.
-                newJobForBrowser();//Генерируем событие-Информируем все браузеры что есть новая задача.
+                browserPool.eventNewJobForBrowser();//Генерируем событие-Информируем все браузеры что есть новая задача.
             }
 
             //Для данного типа это обязательно согласно документации.
@@ -775,7 +696,8 @@ namespace ScreenShotGenerator.Services
             if(outFilesSize>caсheSpaceLimit)
             {
                 Log.Information("Exceeded max dir limit. Begin clear dir.");
-                clearCacheForcibly(cacheRemainingSize);
+                Task t=new Task(()=>clearCacheForcibly(cacheRemainingSize));
+                t.Start();
             }
 
           
@@ -1006,7 +928,15 @@ namespace ScreenShotGenerator.Services
 
 
 
-                dbContext.SaveChanges();
+                try
+                {
+                    dbContext.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Error save Db." + ex.Message);
+                }
+
                 Log.Information("End clear " + clearTbCnt.ToString() + " in db cache tables.");
 
             }
@@ -1037,6 +967,9 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private void clearCacheForcibly(UInt32 remainingSize)
         {
+            if (beginForciblyCleanCashe) return; //Начата принудительная чистка кеша.
+            beginForciblyCleanCashe = true;
+
             Log.Information("Forcibly clear cache after limit tmp dir.");
 
             using (var scope = scopeFactory.CreateScope())
@@ -1087,10 +1020,23 @@ namespace ScreenShotGenerator.Services
                     
                 }
 
-                dbContext.SaveChanges();
-                Log.Information("End Forcibly delete. Remove "+ itemCount.ToString()+" items.");
+              
 
-            }      
+                Log.Information("End Forcibly delete. Remove "+ itemCount.ToString()+" items.");
+                //Ставим истинный размер текущего кэша.
+                outFilesSize -= delSize;
+
+                try
+                {
+                    dbContext.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Error save Db." + ex.Message);
+                }
+            }
+
+            beginForciblyCleanCashe = false;
 
         }
 

@@ -61,6 +61,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Идентификатор браузера, нужен только для логирования.
         /// </summary>
         private int browserId;
+        /// <summary>
+        /// Пустая страница на которую заходит браузер.
+        /// </summary>
+        public string blankPage { get; set; }
         public ImpBrowserControlChromeTabs(int pageLoadTimeouts, int javaScriptTimeouts, bool enableLog, int browserId)
         {
             //Путь к рабочей директории приложения.

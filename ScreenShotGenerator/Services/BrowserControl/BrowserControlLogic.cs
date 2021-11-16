@@ -75,8 +75,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Количество сделанных скрин шоттов.
         /// </summary>
         private int countScreenShots;
-
-        
+                
 
         /// <summary>
         /// Событие по завершению выполнения задачи.
@@ -140,7 +139,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Обработчик события появления новой работы в ScreenShoter.
         /// </summary>
         public void OnNewJob()
-        {
+        {           
             waiter.Set(); //Будем логику обработки новой задачи.
         }
 
@@ -183,7 +182,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 {
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
-                  
+                   
                     continue;
                 }
 
@@ -204,7 +203,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                     //Проверяет валидность указанного URL. Пуст, возможно ли преобразование ДНС.
                     if (!checkValidUrl(p))
-                    {
+                    {                      
                         //Формирую событие по окончанию выполнения задачи.
                         finishedJob(p.requestId); //Передаю идентификатор http запроса.
                         continue;
@@ -214,14 +213,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
                     //Путь куда сохранять файл.
                     string filePath = Path.Combine("wwwroot/" + tmpDir, p.fileName);
-
+                    
 
                     //Cоздание скриншота.
                     // Log.Information("take "+p.url+";Browser="+browserId.ToString());                  
                     string err = Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime,p.imageSize,
                         ref p.fileSize);
                     //Log.Information("size="+outSize.ToString());
-
+                  
                     //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
                     if (!threadIsRun) return;
 
@@ -262,6 +261,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                             //Формирую событие по окончанию выполнения задачи.
                             finishedJob(p.requestId); //Передаю идентификатор http запроса.
+                           
 
                             break;
                         }

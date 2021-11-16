@@ -52,6 +52,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private string curentDirectory;
 
+        /// <summary>
+        /// Пустая страница на которую заходит браузер.
+        /// </summary>
+        public string blankPage { get; set; }
 
         public ImpBrowserControlFireFox(int pageLoadTimeouts, int javaScriptTimeouts)
         {
@@ -174,8 +178,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             try
             {
                 //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
-                Browser.Navigate().GoToUrl("http://localhost:5000/blankPage.html");
-
+                Browser.Navigate().GoToUrl(blankPage);
             }
             catch (Exception ex)
             {

@@ -37,6 +37,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private string curentDirectory;
 
+        /// <summary>
+        /// Пустая страница на которую заходит браузер.
+        /// </summary>
+        public string blankPage { get; set; }
 
         public ImpBrowserControlEdge(int pageLoadTimeouts, int javaScriptTimeouts)
         {

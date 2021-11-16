@@ -31,5 +31,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <returns></returns>
         string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime, ImageSize imgSize, ref UInt32 outSize);
 
+        /// <summary>
+        /// Пустая страница на которую заходит браузер.
+        /// </summary>
+        string blankPage { get; set; }
+
     }
 }
