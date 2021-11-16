@@ -207,24 +207,19 @@ namespace ScreenShotGenerator.Services.BrowserControl
             {
                 string str = "Exception to GoToUrl: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
-                //Обработали исключение, сделали скрин шот, отправили пользователю.
-                if(ex.Message.Contains("is not a valid URL"))
+                
+                /*
+                if(!ex.Message.Contains("Timeout loading page"))
                 {
                     return "Error 703";
                 }
-
+                */
             }
 
             //Замеряю истекшее время.
             sw.Stop();
             double elipsed = sw.Elapsed.TotalSeconds;
             elipsedTime = (float)Math.Round(elipsed, 2);
-            /* 
-             * Если потребуется обработка ошибок.
-                  string bodyText =Browser.FindElement(By.TagName("body")).Text;
-                 //Обработка ошибки 404.
-                     if(bodyText.Contains("404"))return "Error 404 in body:" + bodyText; 
-           */
 
             Screenshot screenshot = null;
             try
@@ -242,17 +237,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
 
 
-             //Если все таки получиться отключить куки, тогда прийдеться использовать это.
-            //driver.findElement(By.xpath("//a[@class='button allow']/span[text()='Allow cookies']")).click();
-
             try
             {
-
                 string filePathFull = Path.Combine(curentDirectory, filePath);
                 ThingsForBrowser.reduceImage(screenshot.AsByteArray, imgSize, filePathFull,ref outSize);
-                //screenshot.SaveAsFile(filePathFull, ScreenshotImageFormat.Jpeg);
-                //screenshot = null;
 
+                //Проверка наличия открытых нескольких окон.И их закрытие. Если этого не делать,страницы складываются
+                //в swap, что приводит к его переполнению.
+                checkManyOpenWindows();
             }
             catch (Exception ex)
             {
@@ -262,8 +254,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return "Error 702";
             }
 
-
-        
+       
             return null;
 
         }
@@ -273,6 +264,25 @@ namespace ScreenShotGenerator.Services.BrowserControl
             Browser.Quit();
         }
 
+        /// <summary>
+        /// Проверка наличия открытых нескольких окон. И их закрытие.
+        /// </summary>
+        private void checkManyOpenWindows()
+        {
+            //Проверка наличия нескольких открытых окон.
+            List<string> brWindow = Browser.WindowHandles.ToList();
+            if (brWindow.Count > 1)
+            {
+                Log.Information("----------Warning:Browser open " + brWindow.Count.ToString() 
+                    + " window. Begin close.------");
+                foreach (var b in brWindow)
+                    Log.Information("Window id=" + b);
+
+                Log.Information("---------------");
+                Browser.Close();
+                Browser.SwitchTo().Window(brWindow[1]); //Переключаюсь на последнею открытую.
+            }
+        }
     }
 }
 

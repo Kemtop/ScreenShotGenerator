@@ -39,4 +39,4 @@ msbuild.wrn
 .vs/
 
 #Logs project.
-Logs/
+ScreenShotGenerator/Logs/

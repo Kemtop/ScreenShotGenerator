@@ -176,12 +176,16 @@ namespace ScreenShotGenerator.Services
             //Общий размер оставшихся файлов после принудительной чистки кеша.
             int tmpDirRemainingSize= parceIntCfgValue(configuration, "tmpDirRemainingSize", 1024);
             cacheRemainingSize = ((UInt32)tmpDirRemainingSize) * 1024;
+            
+            //Перезагружать браузер после определенного количество скриншотов. 0-не перезагружать.
+            int browserRestartAfterScreens =parceIntCfgValue(configuration, "browserRestartAfterScreens", 10000);
 
             browserPool = new BrowserPool(tmpDir, ref poolTask, ref lockPoolTask,
                 OnBrowserTaskCompleted);
             browserPool.saveBrowserErrorDg = saveBrowserError;
             browserPool.javaScriptTimeouts = javaScriptTimeouts;
             browserPool.pageLoadTimeouts = pageLoadTimeouts;
+            browserPool.browserRestartAfterScreens = browserRestartAfterScreens;
         }
 
 

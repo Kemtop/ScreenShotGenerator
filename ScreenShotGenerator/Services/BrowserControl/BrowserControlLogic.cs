@@ -14,6 +14,7 @@ using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Unicode;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -25,6 +26,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
     /// <returns></returns>
     public delegate void BrowserEndJobOnPage(string uuid);
 
+    /// <summary>
+    /// Делегат для события по завершению жизненного цикла, исчерпания лимита по выполнению скриншоттов.
+    /// </summary>
+    /// <returns></returns>
+    public delegate void BrowserEndLife(int BrowserId);
 
     /// <summary>
     /// Логика управления браузером.
@@ -76,6 +82,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private int countScreenShots;
                 
+        /// <summary>
+        /// Список кириллических символов, для ускорения проверки url.
+        /// </summary>
+        private  char[] cyrillicChars;
 
         /// <summary>
         /// Событие по завершению выполнения задачи.
@@ -87,14 +97,37 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private AutoResetEvent waiter = new AutoResetEvent(false);
 
+        /// <summary>
+        /// Перезагружать браузер после определенного количество скриншотов. 0-не перезагружать.
+        /// </summary>
+        public int browserRestartAfterScreens;
+
+        /// <summary>
+        ///Событие по завершению жизненного цикла, исчерпания лимита по выполнению скриншотов.
+        /// </summary>
+        /// <returns></returns>
+        public event BrowserEndLife endLife;
+        /// <summary>
+        /// Флаг отправки события завершения жизненного цикла. Событие отправляется единоразово.
+        /// </summary>
+        private bool callEndLifeTime;
+
+        /// <summary>
+        /// Запущен процесс завершения работы браузера.
+        /// </summary>
+        private bool beginShutdown;
+
         public BrowserControlLogic(IBrowserControl Browser_, saveBrowserError saveBrowserErrorDg_, string tmpDir)
         {
             saveBrowserErrorDg = saveBrowserErrorDg_;
             this.tmpDir = tmpDir;
             Browser = Browser_;
             Browser.saveBrowserErrorDg = saveBrowserErrorDg;
-           
+            cyrillicChars=getCyrillicChars();//Список кириллических символов, для ускорения проверки url.
+            
         }
+
+       
 
         /// <summary>
         /// Обработка задач в потоке задач. Запускает отдельную задачу для проверки и обработки пула.
@@ -144,6 +177,15 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
 
+        /// <summary>
+        /// Запуск процесса остановки браузера.
+        /// </summary>
+        public void shutdown()
+        {
+            beginShutdown = true;
+            waiter.Set(); //Будем логику обработки новой задачи.            
+        }
+
 
         /// <summary>
         /// Проверяет есть ли в пуле новые задачи, выполняет их.
@@ -156,6 +198,13 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 List<mJobPool> data = null;
 
                 waiter.WaitOne();//Жду появления новой задачи.
+
+                //Остановка работы браузера.
+                if(beginShutdown)
+                {
+                    Browser.quit();
+                    return;
+                }
 
 
                 //Блокирую пул для других потоков.
@@ -186,15 +235,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     continue;
                 }
 
-                //Превышен лимит.
-                if(countScreenShots>10000)
-                {
-                    //Перезапуск браузера.
-                    Browser.quit();
-                    countScreenShots = 0;
-                    Browser.runBrowser();
-                }
-
+                //Проверка лимита на выполнение скриншотов,и генерация событий.
+                checkLifeTime();
+                
 
                 foreach (mJobPool p in data)
                 {
@@ -296,10 +339,21 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             try
             {
-                //string u = Uri.UnescapeDataString(p.url);
                 Uri uri = new Uri(p.url);
-                string t= uri.DnsSafeHost;
-                IPAddress[] addresses = Dns.GetHostAddresses(uri.Host);
+
+                //Поиск кирилических символов в домене.
+                bool res = uri.Host.Any(ch => Array.BinarySearch(cyrillicChars, ch) >= 0);
+
+                if(res)
+                {
+                    //Если сайт кирилицой, перекодируем его в Punycode иначе dns не поймет.
+                    System.Globalization.IdnMapping idn = new System.Globalization.IdnMapping();
+                    string punyUrl = idn.GetAscii(uri.Host);
+                    IPAddress[] aIp = Dns.GetHostAddresses(punyUrl);
+                    return true;
+                }
+
+                 IPAddress[] addresses = Dns.GetHostAddresses(uri.Host);
             }
             catch
             {
@@ -315,6 +369,17 @@ namespace ScreenShotGenerator.Services.BrowserControl
             return true;
         }
 
+        /// <summary>
+        /// Возвращает кириллические символы.
+        /// </summary>
+        /// <returns></returns>
+        private char[] getCyrillicChars()
+        {
+            return Enumerable
+                            .Range(UnicodeRanges.Cyrillic.FirstCodePoint, UnicodeRanges.Cyrillic.Length)
+                            .Select(ch => (char)ch)
+                            .ToArray();
+        }
 
         /// <summary>
         /// Проверяет итоговый файл на существование, на размер, и на заполнение только белым или только черным.
@@ -399,7 +464,22 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
         }
 
-      
+        /// <summary>
+        /// Проверка лимита на выполнение скриншотов,и генерация событий.
+        /// </summary>
+         private void checkLifeTime()
+        {
+            //Не включен режим бесконечной работы.Событие не генерировали. Превышен лимит.
+            if ((browserRestartAfterScreens!=0)&&(!callEndLifeTime)&&(countScreenShots >browserRestartAfterScreens))
+            {
+                callEndLifeTime = true; //Запрет повторной генерации события.
+                //Генерирую события окончания срока эксплуатации браузера.
+                endLife(browserId);
+                                    
+            }
+        }
+
+
         /// <summary>
         /// Копирует файл.
         /// </summary>

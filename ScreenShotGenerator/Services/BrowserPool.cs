@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ScreenShotGenerator.Services
@@ -28,6 +29,11 @@ namespace ScreenShotGenerator.Services
     {
         //Пул объектов для управления браузерами.
         List<BrowserControlLogic> poolBrowserControls;
+
+        /// <summary>
+        /// Блокиратор пула браузеров.
+        /// </summary>
+        object lockerPool = new object();
 
         /// <summary>
         /// Событие появление новой работы для браузера.
@@ -58,10 +64,26 @@ namespace ScreenShotGenerator.Services
         private String tmpDir;
 
         /// <summary>
+        /// Уникальный идентификатор браузера.
+        /// </summary>
+        private int browserId=1;
+
+        /// <summary>
+        ///Содержимое страницы на которую браузер переходит перед созданием скрина. 
+        /// </summary>
+        string blankPage;
+
+        /// <summary>
         /// Обработчик события по завершению выполнения задачи браузерами.
         /// </summary>
         BrowserEndJobOnPage OnBrowserTaskCompleted;
 
+        /// <summary>
+        /// Перезагружать браузер после определенного количество скриншотов. 0-не перезагружать.
+        /// </summary>
+        public int  browserRestartAfterScreens;
+
+        
 
         public BrowserPool(String tmpDir, ref poolTasks poolTask,
             ref object lockPoolTask, BrowserEndJobOnPage OnBrowserTaskCompleted)
@@ -106,7 +128,19 @@ namespace ScreenShotGenerator.Services
         }
 
 
+        /// <summary>
+        /// Возвращает очередной идентификатор браузера.
+        /// </summary>
+        /// <returns></returns>
+        private int getBrowserId()
+        {
+            if (browserId < Int32.MaxValue - 10)
+                browserId++;
+            else
+                browserId = 1;
 
+            return browserId;
+        }
 
 
         /// <summary>
@@ -116,58 +150,73 @@ namespace ScreenShotGenerator.Services
         public void createPool(int poolBrowserSize)
         {
             //Считываю страницу на которую браузер переходит перед созданием скрина. Говррю что это не url,а html строка.
-            string blankPage= "data:text/html;charset=utf-8,"+loadBlankPage();
+             blankPage= "data:text/html;charset=utf-8,"+loadBlankPage();
             
             //Создаю пул браузеров.
             for (int i = 0; i < poolBrowserSize; i++)
             {
-                Log.Information("Create browser " + (i + 1).ToString()); //Вывод информации.
+                int id = getBrowserId(); //Уникальный идентификатор браузера.
+
+                Log.Information("Create browser " + id.ToString()); //Вывод информации.
 
                 try
                 {
-                    //Отладка.
-                     bool FireFox = true;
-                    //bool FireFox = false;
-                    BrowserControlLogic Bl = null; //Логика управления браузером.
-                    IBrowserControl Br = null; //Браузер.
-
-                    if (FireFox)
-                    {
-                        /*
-                          Он тоже болен болезнью хрома.
-                       Bl = new BrowserControlLogic(
-                       new ImpBrowserControlEdge(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
-                       saveBrowserErrorDg, tmpDir);
-                        */
-                        Br = new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts);
-                    }
-                    else
-                    {
-                       //Задаю таймауты загрузки.
-                        Br = new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts, true, i + 1);
-                                              //Создаем экземпляр обьекта для управления браузером.
-                    }
-
-                    Br.blankPage = blankPage; //Страница перед созданием скриншота.
-                    Bl = new BrowserControlLogic(Br, saveBrowserErrorDg, tmpDir);
-                    Bl.tasksPerThread = 1; //Количество задач из пула которые браузер обрабатывает за раз.
-                    Bl.browserId = i + 1; //Ид браузера, что бы потоки как то можно отличать.
-
-                    if (!Bl.startBrowser())//Запустить браузер. Выходим если не смог.
-                        break;
-
-                    //Назначаем обработчик завершения задачи.
-                    Bl.finishedJob += OnBrowserTaskCompleted;
-                    newJobForBrowser += Bl.OnNewJob; //Подписываем все браузеры на информирование о новой задаче.
-
-                    Bl.processPool(ref poolTask, ref lockPoolTask); //Запустить обработку пула задач.
-                    poolBrowserControls.Add(Bl);
+                    //Запускает браузер и создает логику управления.
+                    createItem(blankPage, id);
                 }
                 catch (Exception ex)
                 {
                     Log.Error("Exception in [createBrowserPool]:" + ex.Message);
                 }
             }
+        }
+
+        /// <summary>
+        /// Запускает браузер и создает логику управления.
+        /// </summary>
+        private void createItem(string blankPage,int browserId)
+        {
+            //Отладка.
+            bool FireFox = true;
+            //bool FireFox = false;
+            BrowserControlLogic Bl = null; //Логика управления браузером.
+            IBrowserControl Br = null; //Браузер.
+
+            if (FireFox)
+            {
+                /*
+                  Он тоже болен болезнью хрома.
+               Bl = new BrowserControlLogic(
+               new ImpBrowserControlEdge(pageLoadTimeouts, javaScriptTimeouts),//Задаю таймауты загрузки.
+               saveBrowserErrorDg, tmpDir);
+                */
+                Br = new ImpBrowserControlFireFox(pageLoadTimeouts, javaScriptTimeouts);
+            }
+            else
+            {
+                //Задаю таймауты загрузки.
+                Br = new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts, true, browserId);
+                //Создаем экземпляр обьекта для управления браузером.
+            }
+
+            Br.blankPage = blankPage; //Страница перед созданием скриншота.
+            Bl = new BrowserControlLogic(Br, saveBrowserErrorDg, tmpDir);
+            Bl.tasksPerThread = 1; //Количество задач из пула которые браузер обрабатывает за раз.
+            Bl.browserId = browserId; //Ид браузера, что бы потоки как то можно отличать.
+
+            if (!Bl.startBrowser())//Запустить браузер. Выходим если не смог.
+                return;
+
+            //Назначаем обработчик завершения задачи.
+            Bl.finishedJob += OnBrowserTaskCompleted;
+            newJobForBrowser += Bl.OnNewJob; //Подписываем все браузеры на информирование о новой задаче.
+            Bl.endLife += OnEndLifeBrowser; //Обрабатываем лимит срока работы браузера.
+
+            //Перезагрузить браузер после лимита по количеству скринов.
+            Bl.browserRestartAfterScreens = browserRestartAfterScreens;
+
+            Bl.processPool(ref poolTask, ref lockPoolTask); //Запустить обработку пула задач.
+            poolBrowserControls.Add(Bl);
         }
 
 
@@ -187,5 +236,27 @@ namespace ScreenShotGenerator.Services
             //Очищаю пулл.
             poolBrowserControls.Clear();
         }
+
+
+        /// <summary>
+        /// Обработчик события по окончанию времени жизни браузера.
+        /// </summary>
+        /// <param name="browserId"></param>
+        private void OnEndLifeBrowser(int browserId)
+        {
+            //Запускает новый браузер и создает логику управления.
+            createItem(blankPage, getBrowserId());
+
+            //Ищем браузер который нужно остановить.
+            BrowserControlLogic Bl = poolBrowserControls.First(x=>x.browserId==browserId);
+            Bl.shutdown();//Остановка браузера.
+            Thread.Sleep(10000);
+            lock(lockerPool)
+            {
+                poolBrowserControls.Remove(Bl);
+            }
+           
+        }
+
     }
 }
