@@ -248,6 +248,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
             catch (Exception ex)
             {
+                //Решить проблемму 	Exception to GetScreenshot: Dismissed user prompt dialog:
+
                 //Добавить стандартную картинку.
                 String str = "Exception in metod takeScreenShot where save screenshot: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename);

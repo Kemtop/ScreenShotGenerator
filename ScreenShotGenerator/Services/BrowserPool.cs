@@ -209,7 +209,11 @@ namespace ScreenShotGenerator.Services
             Bl.browserRestartAfterScreens = browserRestartAfterScreens;
 
             Bl.processPool(ref poolTask); //Запустить обработку пула задач.
-            poolBrowserControls.Add(Bl);
+            lock(lockerPool)
+            {
+                poolBrowserControls.Add(Bl);
+            }
+           
         }
 
 
@@ -250,6 +254,71 @@ namespace ScreenShotGenerator.Services
                 poolBrowserControls.Remove(Bl);
             }
            
+        }
+
+
+        /// <summary>
+        /// Возвращает количество работающих браузеров на текущий момент.
+        /// </summary>
+        /// <returns></returns>
+        public int browserCount()
+        {
+            lock (lockerPool)
+            {
+               return poolBrowserControls.Count;
+            }
+        }
+
+        /// <summary>
+        /// Запускает новые браузеры в количестве.
+        /// </summary>
+        /// <param name="count"></param>
+        public void startNewBrowser(int count)
+        {
+            //Создаю новые браузеры.
+            for (int i = 0; i < count; i++)
+            {
+                int id = getBrowserId(); //Уникальный идентификатор браузера.
+
+                Log.Information("Create browser " + id.ToString()); //Вывод информации.
+
+                try
+                {
+                    //Запускает браузер и создает логику управления.
+                    createItem(blankPage, id);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Exception in [createBrowserPool]:" + ex.Message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Закрывает определенное количество браузеров и оставляем работать(count) указанное число.
+        /// </summary>
+        /// <param name="count"></param>
+        public void leaveWorkBrowsers(int needWork)
+        {
+            lock (lockerPool)
+            {
+               int curentWork = poolBrowserControls.Count();
+               if (needWork >= curentWork) return; //Не чего закрывать.Работает меньше чем требуется.
+
+               int needClose = curentWork - needWork; //Нужно закрыть.
+                                                   //Выбираем требуемое количество браузеров для закрытия.
+                                                   //Закрываем первые, а не последние. Что бы автоматически подчищать.
+                IEnumerable<BrowserControlLogic> BLtoClose = 
+                    poolBrowserControls.OrderBy(x=>x.browserId).Take(needClose);
+                //Отправляем всем сигнал завершения работы.
+                foreach (BrowserControlLogic B in BLtoClose)
+                {
+                    B.shutdown();
+                    poolBrowserControls.Remove(B); //Очистить пул.
+                }
+                   
+            }
+
         }
 
     }

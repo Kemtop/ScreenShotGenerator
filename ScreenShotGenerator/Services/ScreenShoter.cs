@@ -57,6 +57,9 @@ namespace ScreenShotGenerator.Services
         int browserTasksPerThread = 5; //Количество задач из пула которые браузер обрабатывает за раз.
         int clearCashInterval = 10; //Интервал очистки кеша, в часах.
 
+        int averageTime = 30; // Среднее время выполнения запроса (по практике)
+        int maxCountBrowser = 5; // Максимальное кол-во запущенных браузеров
+
         /// <summary>
         /// Включает чтение кеши из базы данных при запуске сервиса.
         /// Используется для отладки приложения.
@@ -316,21 +319,50 @@ namespace ScreenShotGenerator.Services
         /// Иначе =null
         /// </summary>
         /// <returns></returns>
-        private mJobPool allowAcceptNewTasks(string url)
+        private bool allowAcceptNewTasks(string[] urls)
         {
-            mJobPool task = null;
-            int cnt = poolTask.waitTasksCnt(); //Количество ожидающих задач.
-            //Больше чем браузер обрабатывает за раз.
-            if (cnt > browserTasksPerThread + 25)
-            {
-                task = new mJobPool();
-                task.id = -1;
-                task.url = url;
-                task.status = (int)enumTaskStatus.Error;
-                task.fileName = "Too many waiting tasks in pool. Now " + cnt.ToString();
+            int countNewTask = urls.Length; //кол-во урлов в запросе (4)
+
+            /* Простой алгоритм.*/
+            //Количество задач ожидающих в пуле(статус 0);
+            int waitTaskCount = poolTask.waitTasksCnt(); // Получаем Количество задач из списка со статусом WAIT (8)
+                                                         //Количество задач который выполняют браузеры.
+            // Получаем Количество задач из списка со статусом PROGRESS (4)
+            int progressTaskCount = poolTask.curentElementsInProcessCnt();
+
+            int maxCountTaskForBrowser = 60 / averageTime; // Макс. кол-во задач на браузер (2)
+                                                           //countNewTask количество задач который мы хотим выполнять.
+            int taskCount = countNewTask + waitTaskCount + progressTaskCount; // Кол-во задач для будущего выполнения (16)
+            int needBrowserCount = taskCount / maxCountTaskForBrowser; // Кол-во браузеров для выполнения текущих задач (8)
+
+            if (needBrowserCount > maxCountBrowser)
+            { // Задачу добавить не можем, так как не справимся 
+                return false;
             }
 
-            return task;
+            int realWorkBrowser = browserPool.browserCount(); //Реальное кол-во запущенных браузеров
+            // Проверяем необходимость запуска доп. браузеров
+            if (needBrowserCount > realWorkBrowser)
+            {
+                //needBrowserCount-количество  браузеров которые должны работать в данный момент.
+                browserPool.startNewBrowser(needBrowserCount); //Запускаю новые браузеры.
+            }
+
+            int minCountBrowser = poolBrowserSize; //Минимальное кол-во запущенных браузеров
+
+            // Проверяем необходимость остановки доп. браузеров
+            if ((realWorkBrowser - needBrowserCount) >= 2)
+            {
+                if (needBrowserCount < minCountBrowser)
+                    needBrowserCount = minCountBrowser;
+                else
+                    needBrowserCount += 1;
+
+                //needBrowserCount-количество  браузеров которые должны работать в данный момент.
+                browserPool.leaveWorkBrowsers(needBrowserCount); //Оставляем работать требуемое количество.
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -340,8 +372,12 @@ namespace ScreenShotGenerator.Services
         /// <returns></returns>
         public List<mUserJson> runJob(string[] urls, string userIP, string conUUID)
         {
-            //Получение корневого url запроса, если уже его не получили.
-            // getHostName();
+            //Можем ли мы справиться с задачей?
+             if(!allowAcceptNewTasks(urls))
+            {
+                //Не можем. Возвращаем json с сообщениями.
+                return generateBusyAnswer(urls);
+            }
 
             //Список для быстрого мониторинга отправленных задач.
             //Так как содержит ссылки на задачи.
@@ -367,17 +403,11 @@ namespace ScreenShotGenerator.Services
                     t.imageSize.width = 1280;
                     t.imageSize.height = 1060;
 
-
                     //Увеличивает значение счетчика идентификатора задач.
                     incElementId();
 
-                    //Не переполнен ли пул задач?
-                    mJobPool deny = allowAcceptNewTasks(url);
-                    if (deny == null)
-                        poolTask.add(t); //Добавляю задачу в пулл задач.
-                    else
-                        t = deny; //Сообщение об ошибке переполения пула.
-
+                    poolTask.add(t); //Добавляю задачу в пулл задач.
+                   
                 }
                 else //Нашел выполненную.
                 {
@@ -494,7 +524,7 @@ namespace ScreenShotGenerator.Services
         {
             foreach (mJobPool j in jb)
             {
-                //Возникла ошибка.
+                //Если новая задача.
                 if (j.status == (int)enumTaskStatus.NewTask)
                 {
                     j.fileName = "Tool long wait complete request from browser.";
@@ -502,6 +532,28 @@ namespace ScreenShotGenerator.Services
                 }
             }
         }
+
+        /// <summary>
+        /// Формирует сообщение о занятости сервиса.
+        /// </summary>
+        /// <param name="urls"></param>
+        /// <returns></returns>
+        private List<mUserJson> generateBusyAnswer(string[] urls)
+        {
+            List<mUserJson> userList = new List<mUserJson>();
+
+            foreach (string url in urls)
+            {
+                mUserJson userLine = new mUserJson();
+                userLine.url = url;
+                userLine.status = 2;
+                userLine.log = "Service overload";
+                userList.Add(userLine);
+            }
+
+            return userList;
+        }
+
 
         /// <summary>
         /// Получение корневого url, если уже его не получили.
