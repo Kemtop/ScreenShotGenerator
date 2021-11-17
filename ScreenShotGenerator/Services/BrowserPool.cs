@@ -54,9 +54,7 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         public saveBrowserError saveBrowserErrorDg;
 
-        //Синхронизация потоков, для работы с общим пулом.
-        object lockPoolTask;
-        poolTasks poolTask;
+        PoolTasks poolTask;
 
         /// <summary>
         /// Директория для хранения временных файлов.
@@ -85,16 +83,11 @@ namespace ScreenShotGenerator.Services
 
         
 
-        public BrowserPool(String tmpDir, ref poolTasks poolTask,
-            ref object lockPoolTask, BrowserEndJobOnPage OnBrowserTaskCompleted)
+        public BrowserPool(String tmpDir, ref PoolTasks poolTask,BrowserEndJobOnPage OnBrowserTaskCompleted)
         {
             poolBrowserControls = new List<BrowserControlLogic>();
             //this.saveBrowserErrorDg = saveBrowserErrorDg;
             this.tmpDir = tmpDir;
-
-
-            //Синхронизация потоков, для работы с общим пулом.
-            this.lockPoolTask = lockPoolTask;
             this.poolTask = poolTask;
             this.OnBrowserTaskCompleted = OnBrowserTaskCompleted;
 
@@ -215,7 +208,7 @@ namespace ScreenShotGenerator.Services
             //Перезагрузить браузер после лимита по количеству скринов.
             Bl.browserRestartAfterScreens = browserRestartAfterScreens;
 
-            Bl.processPool(ref poolTask, ref lockPoolTask); //Запустить обработку пула задач.
+            Bl.processPool(ref poolTask); //Запустить обработку пула задач.
             poolBrowserControls.Add(Bl);
         }
 

@@ -43,15 +43,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private IBrowserControl Browser;
 
         //Пул задач.
-        private poolTasks poolTasks;
+        private PoolTasks poolTasks;
 
         /// <summary>
         /// Разрешен запуск потока. Флаг используется для остановки потока.
         /// </summary>
         private bool threadIsRun;
-
-        //Синхронизация потоков.
-        private object lockPoolTasks;
 
         //Директория для хранения картинок.
         private string tmpDir;
@@ -59,7 +56,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         /// Задача выборки данных из пула и их обработки.
         /// </summary>
-         private Task workTask;
+        private Task workTask;
 
 
         /// <summary>
@@ -81,11 +78,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Количество сделанных скрин шоттов.
         /// </summary>
         private int countScreenShots;
-                
+
         /// <summary>
         /// Список кириллических символов, для ускорения проверки url.
         /// </summary>
-        private  char[] cyrillicChars;
+        private char[] cyrillicChars;
 
         /// <summary>
         /// Событие по завершению выполнения задачи.
@@ -123,22 +120,19 @@ namespace ScreenShotGenerator.Services.BrowserControl
             this.tmpDir = tmpDir;
             Browser = Browser_;
             Browser.saveBrowserErrorDg = saveBrowserErrorDg;
-            cyrillicChars=getCyrillicChars();//Список кириллических символов, для ускорения проверки url.
-            
+            cyrillicChars = getCyrillicChars();//Список кириллических символов, для ускорения проверки url.
+
         }
 
-       
+
 
         /// <summary>
         /// Обработка задач в потоке задач. Запускает отдельную задачу для проверки и обработки пула.
         /// </summary>
         /// <param name="poolTasks"></param>
-        public void processPool(ref poolTasks pool, ref object locker)
+        public void processPool(ref PoolTasks pool)
         {
             this.poolTasks = pool;
-            this.lockPoolTasks = locker;
-                    
-
             threadIsRun = true; //Задача может работать.
                                 //Запускаю задачу.
             workTask = new Task(processPoolThread);
@@ -151,7 +145,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public bool startBrowser()
         {
-          return Browser.runBrowser();
+            return Browser.runBrowser();
         }
 
 
@@ -172,7 +166,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Обработчик события появления новой работы в ScreenShoter.
         /// </summary>
         public void OnNewJob()
-        {           
+        {
             waiter.Set(); //Будем логику обработки новой задачи.
         }
 
@@ -195,49 +189,33 @@ namespace ScreenShotGenerator.Services.BrowserControl
             while (threadIsRun)
             {
                 //Список задач из пула.
-                List<mJobPool> data = null;
+
 
                 waiter.WaitOne();//Жду появления новой задачи.
 
                 //Остановка работы браузера.
-                if(beginShutdown)
+                if (beginShutdown)
                 {
                     Browser.quit();
                     return;
                 }
 
+                //Выбирает из пула задач первые новые, в количестве tasksPerThread.
+                //Проставляет им статус "Заблокировано браузером".
+                List<mJobPool> data = poolTasks.getAndLockNewTasks(tasksPerThread, browserId);
 
-                //Блокирую пул для других потоков.
-                lock (lockPoolTasks)
-                {
-                    data = poolTasks.getNeedProcessing(tasksPerThread);
-
-                    //Есть новые задачи.
-                    if (data.Count > 0)
-                    {
-                        //Блокирует для обработки. Другие потоки не будут обращать внимания на данные объекты.
-                        foreach (mJobPool p in data)
-                        {
-                            p.status = (int)enumTaskStatus.LockByBrowser;
-                            p.browserId = browserId;
-                        }
-                    }
-
-                }
-
-
-                //Пул заблокирован или нет данных для обработки.
-                if ((data == null) || (data.Count == 0))
+                //Нет данных для обработки.
+                if (data.Count == 0)
                 {
                     //Сервис останавливают. Выходим.
                     if (!threadIsRun) return;
-                   
+
                     continue;
                 }
 
                 //Проверка лимита на выполнение скриншотов,и генерация событий.
                 checkLifeTime();
-                
+
 
                 foreach (mJobPool p in data)
                 {
@@ -246,30 +224,30 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                     //Проверяет валидность указанного URL. Пуст, возможно ли преобразование ДНС.
                     if (!checkValidUrl(p))
-                    {                      
+                    {
                         //Формирую событие по окончанию выполнения задачи.
                         finishedJob(p.requestId); //Передаю идентификатор http запроса.
                         continue;
                     }
 
-                    String lastError = null; //Последнее сообщение об ошибке, если есть.
+                    String lastError; //Последнее сообщение об ошибке, если есть.
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
                     //Путь куда сохранять файл.
                     string filePath = Path.Combine("wwwroot/" + tmpDir, p.fileName);
-                    
+
 
                     //Cоздание скриншота.
                     // Log.Information("take "+p.url+";Browser="+browserId.ToString());                  
-                    string err = Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime,p.imageSize,
+                    string err = Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime, p.imageSize,
                         ref p.fileSize);
                     //Log.Information("size="+outSize.ToString());
-                  
+
                     //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
                     if (!threadIsRun) return;
 
                     p.timestamp = DateTime.Now;
 
-                    bool allGood = true; //Нет ошибок в процессе работы.
+                    bool allGood; //Нет ошибок в процессе работы.
 
                     //Ошибка создания скрин шота.
                     if (err != null)
@@ -284,38 +262,27 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         allGood = checkResultFile(out lastError, filePath);
                     }
 
-                    //Пока пул не будет доступен. Или поток не остановят.
-                    while (threadIsRun)
+
+                    //Были ли ошибки?
+                    if (allGood)
                     {
-                        lock (lockPoolTasks)
-                        {
-                            //Были ли ошибки?
-                            if (allGood)
-                            {
-                                p.status = (int)enumTaskStatus.End; //Все хорошо.
-                            }                                
-                            else
-                            {
-                                p.status = (int)enumTaskStatus.Error;
-                                p.fileName = lastError;
-                                //Сохраняю логи в БД.
-                                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, lastError, p.url, p.fileName);
-                            }
-
-                            //Формирую событие по окончанию выполнения задачи.
-                            finishedJob(p.requestId); //Передаю идентификатор http запроса.
-                           
-
-                            break;
-                        }
-                                                
+                        p.status = (int)enumTaskStatus.End; //Все хорошо.
+                    }
+                    else
+                    {
+                        p.status = (int)enumTaskStatus.Error;
+                        p.fileName = lastError;
+                        //Сохраняю логи в БД.
+                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, lastError, p.url, p.fileName);
                     }
 
-                        countScreenShots++;
+                    //Формирую событие по окончанию выполнения задачи.
+                    finishedJob(p.requestId); //Передаю идентификатор http запроса.
 
+                    countScreenShots++;
                 }
 
-               
+
             }
         }
 
@@ -344,7 +311,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Поиск кирилических символов в домене.
                 bool res = uri.Host.Any(ch => Array.BinarySearch(cyrillicChars, ch) >= 0);
 
-                if(res)
+                if (res)
                 {
                     //Если сайт кирилицой, перекодируем его в Punycode иначе dns не поймет.
                     System.Globalization.IdnMapping idn = new System.Globalization.IdnMapping();
@@ -353,7 +320,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     return true;
                 }
 
-                 IPAddress[] addresses = Dns.GetHostAddresses(uri.Host);
+                IPAddress[] addresses = Dns.GetHostAddresses(uri.Host);
             }
             catch
             {
@@ -373,7 +340,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Возвращает кириллические символы.
         /// </summary>
         /// <returns></returns>
-        private char[] getCyrillicChars()
+        private static char[] getCyrillicChars()
         {
             return Enumerable
                             .Range(UnicodeRanges.Cyrillic.FirstCodePoint, UnicodeRanges.Cyrillic.Length)
@@ -388,7 +355,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <param name="errMess"></param>
         /// <param name="pathToFile"></param>
         /// <returns></returns>
-        private bool checkResultFile(out string errMess, string pathToFile)
+        private static bool checkResultFile(out string errMess, string pathToFile)
         {
             errMess = null;
 
@@ -426,7 +393,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         /// <param name="fileName"></param>
         /// <returns></returns>
-        private bool checkExistFile(string path)
+        private static bool checkExistFile(string path)
         {
             bool exists = System.IO.File.Exists(path);
             return exists;
@@ -437,7 +404,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         /// <param name="fileName"></param>
         /// <returns></returns>
-        private bool checkFileSize(string path)
+        private static bool checkFileSize(string path)
         {
 
             long length = new System.IO.FileInfo(path).Length;
@@ -453,7 +420,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         /// <param name="input"></param>
         /// <returns></returns>
-        private string getMD5(String input)
+        private static string getMD5(String input)
         {
 
             using (var md5 = MD5.Create())
@@ -467,15 +434,15 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         /// Проверка лимита на выполнение скриншотов,и генерация событий.
         /// </summary>
-         private void checkLifeTime()
+        private void checkLifeTime()
         {
             //Не включен режим бесконечной работы.Событие не генерировали. Превышен лимит.
-            if ((browserRestartAfterScreens!=0)&&(!callEndLifeTime)&&(countScreenShots >browserRestartAfterScreens))
+            if ((browserRestartAfterScreens != 0) && (!callEndLifeTime) && (countScreenShots > browserRestartAfterScreens))
             {
                 callEndLifeTime = true; //Запрет повторной генерации события.
                 //Генерирую события окончания срока эксплуатации браузера.
                 endLife(browserId);
-                                    
+
             }
         }
 
@@ -556,7 +523,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             return 0;
         }
 
-    
+
 
         /*
         /// <summary>
