@@ -18,6 +18,7 @@ namespace TestServices
             {
                 Tests test1 = new Tests();
                 test1.runTest1(args);
+                return;
             }
                 
 
