@@ -66,7 +66,7 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Уникальный идентификатор браузера.
         /// </summary>
-        private int browserId=1;
+        private int browserId;
 
         /// <summary>
         ///Содержимое страницы на которую браузер переходит перед созданием скрина. 
@@ -244,6 +244,7 @@ namespace ScreenShotGenerator.Services
         /// <param name="browserId"></param>
         private void OnEndLifeBrowser(int browserId)
         {
+            Log.Information("Restart browser "+browserId);
             //Запускает новый браузер и создает логику управления.
             createItem(blankPage, getBrowserId());
 

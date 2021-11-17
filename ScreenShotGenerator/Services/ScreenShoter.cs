@@ -27,10 +27,10 @@ namespace ScreenShotGenerator.Services
         private readonly IServiceScopeFactory scopeFactory;
 
         //Синхронизация потоков, для работы с общим пулом.
-        static object lockPoolTask = new object();
+        static object lockPoolTask = new();
 
         //Блокировка кеши poolCache.
-        static object lockCachePool = new object();
+        static object lockCachePool = new();
 
         //Директория для хранения временных файлов.
         const String tmpDir = "imgCache";
@@ -41,7 +41,7 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Пул задач.
         /// </summary>
-        poolTasks poolTask;
+        private poolTasks poolTask;
 
         /// <summary>
         /// Ид элементов в списке. Идентификатор элемента для возможности его сортировки по возрастанию
@@ -85,11 +85,7 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private bool runClearPoolTasks;
 
-        /// <summary>
-        /// Запущен процесс очистки кеши сервиса.
-        /// </summary>
-        private bool runClearCache;
-
+    
         /// <summary>
         /// Токен завершения потока.
         /// </summary>
@@ -178,7 +174,7 @@ namespace ScreenShotGenerator.Services
             cacheRemainingSize = ((UInt32)tmpDirRemainingSize) * 1024;
             
             //Перезагружать браузер после определенного количество скриншотов. 0-не перезагружать.
-            int browserRestartAfterScreens =parceIntCfgValue(configuration, "browserRestartAfterScreens", 10000);
+            int browserRestartAfterScreens =parceIntCfgValue(configuration, "browserRestartAfterScreens", 100);
 
             browserPool = new BrowserPool(tmpDir, ref poolTask, ref lockPoolTask,
                 OnBrowserTaskCompleted);
@@ -229,29 +225,11 @@ namespace ScreenShotGenerator.Services
         /// <param name="lastCnt"></param>
         /// <returns></returns>
         public List<mCacheRam> getCacheItems(int lastCnt)
-        {
-            //Нужно гарантированно вернуть результат.
-            //Жду пока разблокируеться объект или не прийдет сигнал остановки.
-            while (!_cancellationToken.IsCancellationRequested)
-            {
-                //Если запущен процесс чистки кеша. Жду окончания.
-                if(runClearCache)
-                {
-                    Thread.Sleep(300);
-                    continue;
-                }
-
-             
+        {             
                 lock (lockCachePool)
                 {
                     return Cache.getLastItems(lastCnt);
                 }
-
-                //Жду пока ресурс разблокируеться.
-                Thread.Sleep(300);
-            }
-
-            return null;
         }
 
 
@@ -428,8 +406,11 @@ namespace ScreenShotGenerator.Services
                     t.url = url;
                     t.id = elementId; //Идентификатор элемента для возможности его сортировки.
                     t.imageSize = new ImageSize();
-                    t.imageSize.width = 600;
-                    t.imageSize.height = 400;
+                    // t.imageSize.width = 600;
+                    // t.imageSize.height = 400; для теста.
+                    t.imageSize.width = 1280;
+                    t.imageSize.height = 1060;
+                    
 
                     //Увеличивает значение счетчика идентификатора задач.
                     incElementId(); 
@@ -618,27 +599,6 @@ namespace ScreenShotGenerator.Services
         }
 
 
-
-        /// <summary>
-        /// Добавляет данные в кеш. Если ресурс занят-ждет.
-        /// </summary>
-        /// <param name="t"></param>
-        private void waitAddToCachPool(mJobPool j)
-        {
-            while (!_cancellationToken.IsCancellationRequested)
-            {
-                lock (lockCachePool)
-                {
-                    Cache.add(j);
-                    break;
-                }
-
-                //Если ресурс заблокирован, ждем.
-                Thread.Sleep(1000);
-            }
-
-        }
-
         /// <summary>
         /// Добавляет сведения о выполенных задачах в кеш.
         /// </summary>
@@ -663,7 +623,11 @@ namespace ScreenShotGenerator.Services
                         //Что бы не было явных пересечений при обработки одинаковых урл.
                         j.inCash = true; //Говорим что объект кеширован.
 
-                        waitAddToCachPool(j); //Добавляю в кеш, если не заблокирован. Или ждем.                                        
+                        //Добавляю в кеш, если не заблокирован. Или ждем.  
+                        lock (lockCachePool)
+                        {
+                            Cache.add(j);
+                        }                                       
 
                         //Cохраняю в БД на случай перезагрузки сервера.
                         mCashTable line = new mCashTable();
@@ -845,9 +809,6 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private void ClearPoolTasks()
         {
-            //Жду пока разблокируют пулЗадач.
-            while (!_cancellationToken.IsCancellationRequested)
-            {
                 //Запрещает другим потокам работать с пулом на время его очистки.
                 lock (lockPoolTask)
                 {
@@ -864,10 +825,6 @@ namespace ScreenShotGenerator.Services
 
                     return;
                 }
-
-                Thread.Sleep(500);
-            }
-
         }
 
 
@@ -945,24 +902,13 @@ namespace ScreenShotGenerator.Services
 
             }
 
-            //Удаление из памяти.
-            while(!_cancellationToken.IsCancellationRequested)
-            {
                 lock (lockCachePool)
                 {
                     //Удаляет записи, которые хранились более  hour часов.
-                    runClearCache = true;
                     int cnt =Cache.clearOld(clearCashInterval);
-                    runClearCache = false;
                     Log.Information("Clear " + cnt.ToString() + " in memory cache tables.");
-
-                    break;
                 }
-
-                //Жду пока ресурс разблокируеться.
-                Thread.Sleep(300);
-            }                  
-
+              
         }
 
 
@@ -992,18 +938,10 @@ namespace ScreenShotGenerator.Services
                 int itemCount = delRam.Count; //Количество удаляемых записей.
 
                 //Удаление из памяти.
-                while (!_cancellationToken.IsCancellationRequested)
-                {
                     lock (lockCachePool)
                     {
                         Cache.clearInterval(delRam);
-                        break;
                     }
-
-                    //Жду пока ресурс разблокируеться.
-                    Thread.Sleep(300);
-                }
-
 
 
                 foreach (mCacheRam t in delRam)

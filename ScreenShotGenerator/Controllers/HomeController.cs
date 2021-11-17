@@ -18,14 +18,12 @@ namespace ScreenShotGenerator.Controllers
 {
     public class HomeController : Controller
     {
-        private readonly ILogger<HomeController> _logger;
         private readonly IScreenShoter _screenShoter;//Объект создания скрин шота.
         private IHttpContextAccessor HttpContextAccessor { get; }
 
-        public HomeController(ILogger<HomeController> logger, IScreenShoter screenShoter,
+        public HomeController(IScreenShoter screenShoter,
             IHttpContextAccessor httpContextAccessor)
         {
-            _logger = logger;
             _screenShoter = screenShoter;
             HttpContextAccessor = httpContextAccessor;
         }
@@ -56,41 +54,6 @@ namespace ScreenShotGenerator.Controllers
             }
                      
           
-        }
-
-        //Для 
-        // string parameters1 = HttpContextAccessor.HttpContext.Request.Scheme;// QueryString.ToString();
-        //
-        //Удалить если нельзя.
-        private List<string> parceGetParametrs(string inStr,bool useEncoding)
-        {
-            List<string> urls = new List<string>();
-
-            string[] url =inStr.Split("url[");
-
-            foreach(string u in url)
-            {
-                if(u.Contains("]="))
-                {
-                    int pos = u.IndexOf("]=");
-                    if (pos == -1) continue;
-                    //Вырезаю строку после "]=" и до последнего символа(который будет&).
-                    string str1 = u.Substring(pos+2,u.Length-(pos+3));
-
-                    if(useEncoding)
-                    {
-                        str1 = HttpUtility.UrlDecode(str1);
-                    }
-
-                    urls.Add(str1);
-                }
-            }
-
-            //Исправляю проблеммы
-
-
-            return urls;
-
         }
 
 
