@@ -204,6 +204,7 @@ namespace ScreenShotGenerator.Services
             Bl.finishedJob += OnBrowserTaskCompleted;
             newJobForBrowser += Bl.OnNewJob; //Подписываем все браузеры на информирование о новой задаче.
             Bl.endLife += OnEndLifeBrowser; //Обрабатываем лимит срока работы браузера.
+            Bl.eventBrowserDie += OnBrowserDie; //Событие по внезапному выходу из строя.
 
             //Перезагрузить браузер после лимита по количеству скринов.
             Bl.browserRestartAfterScreens = browserRestartAfterScreens;
@@ -319,6 +320,21 @@ namespace ScreenShotGenerator.Services
                    
             }
 
+        }
+
+        /// <summary>
+        /// Обработчик события выхода из строя браузера.
+        /// </summary>
+        /// <param name="browserId"></param>
+        private void OnBrowserDie(int browserId)
+        {
+            lock (lockerPool)
+            {
+                //Ищем не рабочий браузер.
+                BrowserControlLogic Bl = poolBrowserControls.First(x => x.browserId == browserId);
+                Bl.eventBrowserDie -= OnBrowserDie;
+                poolBrowserControls.Remove(Bl); //Очистить пул.
+            }
         }
 
     }

@@ -57,7 +57,7 @@ namespace ScreenShotGenerator.Services
         int browserTasksPerThread = 5; //Количество задач из пула которые браузер обрабатывает за раз.
         int clearCashInterval = 10; //Интервал очистки кеша, в часах.
 
-        int averageTime = 30; // Среднее время выполнения запроса (по практике)
+        int averageTime = 2; // Среднее время выполнения запроса (по практике)
         int maxCountBrowser = 5; // Максимальное кол-во запущенных браузеров
 
         /// <summary>
@@ -622,7 +622,7 @@ namespace ScreenShotGenerator.Services
                 foreach (mJobPool j in jb)
                 {
                     //Возвращается не стандартная ошибка. Файлы стандартных ошибок не добавляем в кэш.
-                    if (j.fileName == UrlErrorImg.badUrl) continue;
+                    if (UrlErrorImg.IsSystemErrorPage(j.fileName)) continue;
 
                     //Объект еще не находиться в кеши и обработан успешно.
                     if ((j.inCash == false) && (j.status == 3))

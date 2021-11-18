@@ -21,7 +21,7 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ScreenShotGenerator.Services.BrowserControl
-{
+{    
     /// <summary>
     /// Реализация управления браузером FireFox.
     /// </summary>
@@ -43,19 +43,32 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
 
         /// <summary>
-        /// Делегат для сохранения сведений об ошибках браузера.
-        /// </summary>
-        public saveBrowserError saveBrowserErrorDg { get; set; }
-
-        /// <summary>
         /// Путь к текущей папке.
         /// </summary>
         private string curentDirectory;
 
         /// <summary>
+        /// Были ли призрачные ошибки?
+        /// Вроде Alert окон, открытия новых вкладок и
+        /// Exception in reopenWindow: Dismissed user promp t dialog: Player is not supporte
+        /// </summary>
+        private bool hasGhostError;
+
+        /// <summary>
+        /// Делегат для сохранения сведений об ошибках браузера.
+        /// </summary>
+        public saveBrowserError saveBrowserErrorDg { get; set; }
+
+        /// <summary>
         /// Пустая страница на которую заходит браузер.
         /// </summary>
         public string blankPage { get; set; }
+                
+        /// <summary>
+        /// Возвращает ошибку.
+        /// </summary>
+        public string lastError { get; private set; }
+
 
         public ImpBrowserControlFireFox(int pageLoadTimeouts, int javaScriptTimeouts)
         {
@@ -64,9 +77,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             this.pageLoadTimeouts = pageLoadTimeouts;
             this.javaScriptTimeouts = javaScriptTimeouts;
         }
-
-   
-
+        
 
         /// <summary>
         /// Считываю из appsettings.json опции браузера.
@@ -165,100 +176,244 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
      
         /// <summary>
-        /// Создает скрин шот, в случае ошибок возвращает строку.
+        /// Создает скрин шот, в случае критических ошибок возвращает false.
         /// </summary>
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        public  string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime,
+        public int takeScreenShot(string url, string filePath, string filename, ref float elipsedTime,
             ImageSize imgSize, ref UInt32 outSize)
         {
+            bool hasException = false; //Были ли исключения?
+                       
+            //Закрывает старую вкладку, открывает новую. Возвращаю false если браузер перестал отвечать.
+            if(!reopenWindow()) return -1; //Браузер не работает.
+
             //Переход на пустую страницу для исключения ситуации когда новый сайт по особенному долго
             //грузиться и в итоге получается скрин старого сайта.
-            try
+            //Анализируем ошибки и делаем вывод можно ли дальше работать.
+            if (!Navigate(blankPage, ref hasException, filename)) return -1; //Браузер не работает.
+            //По непонятным причинам браузер не хочет обрабатывать страницу(строку с html),выбивает таймаут. 
+            if(hasException) 
             {
-                //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
-                Browser.Navigate().GoToUrl(blankPage);
+                SaveBrowserError("Warning:" +
+                    "Time out on blank page:", lastError, url, filename); //Сохраняю в лог.
+                Thread.Sleep(500); //Может это поможет.
             }
-            catch (Exception ex)
-            {
-                string str = "Exception to go blankPage.html: " + ex.Message;
-                saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
-                //Обработали исключение, сделали скрин шот, отправили пользователю.
-                if (ex.Message.Contains("Can't open blank page."))
-                {
-                    return "Error 704.Can't open blank page.";
-                }
-
-            }
-
 
             //Измеряю затраченное время на открытие страницы.
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
-            try
-            {
-                //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
-                Browser.Navigate().GoToUrl(url);
+            //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
+            if (!Navigate(url, ref hasException, filename)) return -1; //Браузер не работает.
 
-            }
-            catch (Exception ex)
-            {
-                string str = "Exception to GoToUrl: " + ex.Message;
-                saveBrowserErrorDg((int)enumBrowserError.GoUrl, str, url, filename);
-                
-                /*
-                if(!ex.Message.Contains("Timeout loading page"))
-                {
-                    return "Error 703";
-                }
-                */
-            }
 
             //Замеряю истекшее время.
             sw.Stop();
             double elipsed = sw.Elapsed.TotalSeconds;
             elipsedTime = (float)Math.Round(elipsed, 2);
 
+            //Делаю скриншот.
+            string ExceptionMessage = ""; //Сообщение исключения. 
+            bool beginTry = true; //Пытаюсь сделать скрин.
             Screenshot screenshot = null;
-            try
+            //Если переживаешь насчет вечного цикла-Цикл обязательно остановиться,браузер остановиться по завершению службы,
+            //в итоге получим потерю связи,обработку Die сообщения и выйдем из цикла.
+            int retryCnt = 0;
+            while (beginTry)
             {
-                //Создание скриншотта.
-                screenshot = ((ITakesScreenshot)Browser).GetScreenshot();
-            }
-            catch (Exception ex1)
-            {
-                string str = "Exception to GetScreenshot: " + ex1.Message;
-                saveBrowserErrorDg((int)enumBrowserError.GetScreenshotError, str, url, filename);
-                //Копирует файл с сообщением об ошибке, если проблеммы  копирования возвращает строку с ошибкой.
-                // String standartErrorImg = "noLoadPageErr.jpg";
-                // return copyFile(standartErrorImg, filename); ;
-            }
+                screenshot = takeScreen(ref hasException, ref ExceptionMessage);
+                //Возникло исключение.
+                if (hasException)
+                {
+                    //Появилось alert окно.
+                    if (ExceptionMessage.Contains(FireFoxErrors.userPromtDialog))
+                    {
+                        if (retryCnt > 10)//Слишком много попыток.
+                        {
+                            SaveBrowserError("Too many try close alerts for url=" + url, " ", url," ");
+                            return -2;
+                        }
+                                              
+                        aceeptAlert(url);
+                        Thread.Sleep(800);//Жду может что то под грузится.
+                        retryCnt++;
+                        continue;
+                    }
 
+                    //Браузер умер.
+                    if(ExceptionMessage.Contains(FireFoxErrors.lossConnection))
+                    {
+                        SaveBrowserError("Exception to GetScreenshot: Browser Die.", ExceptionMessage, url, filename);
+                        return -1;
+                    }
+                                      
+                    //Не ведомая нам ошибка.
+                    SaveBrowserError("Exception to GetScreenshot:", ExceptionMessage, url, filename);
+                    break;
+
+                }
+                else //Скрин сделали без исключений.
+                    break;
+            }    
+
+            //Если какие то проблемы создания скрина.
+            if(screenshot==null)
+            {
+                SaveBrowserError("Null in screenshot"," ", url," ");
+                return -2; //Не смог сделать скрин шот по не известным причинам.
+            }    
+               
+            
 
             try
-            {
+            {  
+                //Конвертирую и сохраняю изображение в файл.
                 string filePathFull = Path.Combine(curentDirectory, filePath);
                 ThingsForBrowser.reduceImage(screenshot.AsByteArray, imgSize, filePathFull,ref outSize);
 
                 //Проверка наличия открытых нескольких окон.И их закрытие. Если этого не делать,страницы складываются
                 //в swap, что приводит к его переполнению.
-                checkManyOpenWindows();
+                checkManyOpenWindows(url);
             }
             catch (Exception ex)
             {
-                //Решить проблемму 	Exception to GetScreenshot: Dismissed user prompt dialog:
-
                 //Добавить стандартную картинку.
-                String str = "Exception in metod takeScreenShot where save screenshot: " + ex.Message;
-                saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename);
-                return "Error 702";
+                lastError = "Exception in metod takeScreenShot where save screenshot: " + ex.Message;
+                SaveBrowserError(lastError, "", url, filename);
+                return 0;
             }
 
        
-            return null;
+            return 1;
+        }
 
+        /// <summary>
+        /// Переходит по ссылке, в случае не критических проблем возвращает true.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="ExceptionMessage"></param>
+        /// <returns></returns>
+        private bool Navigate(string url,ref bool hasException, string filename)
+        {
+            hasException = false;
+            try
+            {
+                //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
+                Browser.Navigate().GoToUrl(url);
+            }
+            catch (Exception ex)
+            {
+                string ExceptionMessage = ex.Message;
+                lastError = ExceptionMessage; //Последняя ошибка.
+                hasException = true;
+   
+                //Браузер умер.
+                if (ExceptionMessage.Contains(FireFoxErrors.lossConnection))
+                {
+                    SaveBrowserError("Exception to GetScreenshot: Browser Die.", ExceptionMessage, url, filename);
+                    return false;
+                }
+
+                if (FireFoxErrors.IsCriticalLoadPageError(ExceptionMessage)) //Критическое исключение?.
+                {
+                    SaveBrowserError("Exception to GoToUrl:", ExceptionMessage, url, filename); //Сохраняю в лог.
+                }
+                             
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Закрывает всплывающее окно.
+        /// </summary>
+        private bool aceeptAlert(string url)
+        {
+            hasGhostError = true; //Возможно проблемный сайт.
+
+            try
+            {
+                Browser.SwitchTo().Alert().Accept(); //Закрываю алерт окно, и повторно пытаюсь сделать скрин.
+            }
+           catch(Exception ex)
+            {
+                string ExceptionMessage = ex.Message;
+                //Если Alert().Accept()  срабатывает,то возникает пустое исключение.
+                //Не удалось найти информацию по этому поводу почему так.
+                if (String.IsNullOrEmpty(ExceptionMessage)) return true;
+
+                //Не известное исключение.
+                SaveBrowserError("Exception in aceeptAlert:", ExceptionMessage,url, " ");
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Закрывает старую вкладку, открывает новую. Возвращаю false если браузер перестал отвечать.
+        /// </summary>
+        /// <returns></returns>
+        private bool reopenWindow()
+        {
+            if (!hasGhostError) return true; //Не было проблемных сайтов.
+
+            try
+            {               
+                hasGhostError = false; //Пришли чистить проблемы.
+                //Это тоже не помогает ерунду закрывать.
+                aceeptAlert("reopenWindow");
+
+                Browser.SwitchTo().NewWindow(WindowType.Tab);
+                List<string> brWindow = Browser.WindowHandles.ToList();
+                
+                Browser.SwitchTo().Window(brWindow[0]);
+                Browser.Close();
+                Browser.SwitchTo().Window(brWindow[1]);
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.Contains(FireFoxErrors.lossConnection)) return false;
+                SaveBrowserError("Exception in reopenWindow:", ex.Message, " ", " ");
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Делаю снимок экрана, в случае исключения сообщаю об ошибке.
+        /// </summary>
+        /// <param name="hasException"></param>
+        /// <param name="ExceptionMessage"></param>
+        /// <returns></returns>
+        private Screenshot takeScreen(ref bool hasException,ref string ExceptionMessage)
+        {
+            hasException = false;
+            Screenshot screenshot = null;
+            try
+            {
+                //Создание скриншотта.
+                screenshot = ((ITakesScreenshot)Browser).GetScreenshot(); 
+            }
+            catch (Exception ex)
+            {               
+                hasException = true;
+                ExceptionMessage = ex.Message;
+            }
+
+            return screenshot;
+        }
+
+
+        /// <summary>
+        /// Сохраняет в БД ошибки браузера.
+        /// </summary>
+        /// <param name="Title"></param>
+        /// <param name="Exception"></param>
+        private void SaveBrowserError(string Title,string Exception,string url, string filename)
+        {
+           saveBrowserErrorDg((int)enumBrowserError.GetScreenshotError, Title+" "+Exception, url, filename);
         }
 
         public void quit()
@@ -269,20 +424,43 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         /// Проверка наличия открытых нескольких окон. И их закрытие.
         /// </summary>
-        private void checkManyOpenWindows()
+        private void checkManyOpenWindows(string url)
         {
             //Проверка наличия нескольких открытых окон.
             List<string> brWindow = Browser.WindowHandles.ToList();
             if (brWindow.Count > 1)
             {
+                hasGhostError = true; //Возможно проблемный сайт.
+
                 Log.Information("----------Warning:Browser open " + brWindow.Count.ToString() 
                     + " window. Begin close.------");
+                Log.Information("URL="+ url);
+
                 foreach (var b in brWindow)
                     Log.Information("Window id=" + b);
 
                 Log.Information("---------------");
-                Browser.Close();
-                Browser.SwitchTo().Window(brWindow[1]); //Переключаюсь на последнею открытую.
+
+                //Закрыть все вкладки, оставить одну.
+                int tabs = brWindow.Count;
+                //Закрываю все вкладки с конца, кроме первой.
+                while (tabs>1)
+                {                 
+                    Browser.SwitchTo().Window(brWindow[tabs - 1]); //Переключаюсь на последнюю открытую.
+                    try
+                    {  
+                        //Можем получить проблеммы при определения заголовков и урл, обвернем в трай катч.
+                        Log.Information("Closing id=" + brWindow[tabs - 1] + ";Title=" + Browser.Title +
+                        ";url=" + Browser.Url);
+                    }
+                    catch (Exception) {; }
+                    
+                    Browser.Close(); //Закрываю текущую.
+                   
+                    tabs--;
+                }
+
+                Browser.SwitchTo().Window(brWindow[0]); //Переключаюсь на первую.
             }
         }
     }

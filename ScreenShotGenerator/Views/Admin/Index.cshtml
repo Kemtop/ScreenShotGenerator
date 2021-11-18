@@ -69,11 +69,19 @@
             <span asp-validation-for="clearCashInterval" class="text-danger"></span>
         </div>
         <div class="mb-3">
-            <label for="exampleInputPassword1" class="form-label">Количество работающих браузеров.</label>
+            <label for="exampleInputPassword1" class="form-label">Минимальное количество работающих браузеров.</label>
             <input asp-for="browserAmount" class="form-control" id="exampleInputPassword1">
             <div id="emailHelp" class="form-text">Требует перезагрузки браузеров.</div>
             <span asp-validation-for="browserAmount" class="text-danger"></span>
         </div>
+        <div class="mb-3">
+            <label for="exampleInputPassword1" class="form-label">Максимальное количество работающих браузеров.</label>
+            <input asp-for="browserMax" class="form-control" id="exampleInputPassword1">
+            <div id="emailHelp" class="form-text">Требует перезагрузки браузеров.</div>
+            <span asp-validation-for="browserMax" class="text-danger"></span>
+        </div>
+
+
         <div class="mb-3">
             <label for="exampleInputPassword1" class="form-label">Количество задач обрабатываемых одним браузером.</label>
             <input asp-for="tasksAmount" class="form-control" id="exampleInputPassword1">

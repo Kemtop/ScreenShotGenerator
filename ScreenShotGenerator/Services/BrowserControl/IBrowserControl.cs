@@ -24,17 +24,21 @@ namespace ScreenShotGenerator.Services.BrowserControl
         void quit();
 
         /// <summary>
-        /// Создает скрин шот, в случае ошибок возвращает строку.
+        /// Создает скрин шот,возвращает 1-все хорошо,0-ошибка сервиса,-1-браузер умер.
         /// </summary>
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        string takeScreenShot(string url, string filePath, string filename, ref float elipsedTime, ImageSize imgSize, ref UInt32 outSize);
+        int takeScreenShot(string url, string filePath, string filename, ref float elipsedTime, ImageSize imgSize, ref UInt32 outSize);
 
         /// <summary>
         /// Пустая страница на которую заходит браузер.
         /// </summary>
         string blankPage { get; set; }
+        /// <summary>
+        /// Возвращает ошибку.
+        /// </summary>
+        string lastError { get;}
 
     }
 }

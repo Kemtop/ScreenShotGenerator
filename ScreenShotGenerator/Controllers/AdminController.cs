@@ -236,7 +236,7 @@ namespace ScreenShotGenerator.Controllers
         {
 
             //Данные из таблицы. Первым в списке будут последние записи. В количестве что бы браузер не умер.
-            int selectLinesCnt = 300; //Количество выбранных записей.
+            int selectLinesCnt = 1000; //Количество выбранных записей.
             List<mBrowserErrors> data = _dbContext.browserErrors.OrderByDescending(x=>x.Id).Take(selectLinesCnt).ToList();
 
             //Названия ошибок.

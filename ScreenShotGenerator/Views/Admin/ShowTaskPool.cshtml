@@ -33,7 +33,7 @@
                     <td>@l.wastedTime</td>
                     <td>                                 
                     <a href="@l.url">
-                        @if (l.url.Length > 40) { l.url=l.url.Substring(0,40) + "..."; }
+                        @if ((l.url!=null)&&(l.url.Length > 40)) { l.url=l.url.Substring(0,40) + "..."; }
                         @l.url </a></td>
                     <td>
                         <a href="/imgCache/@l.fileName">

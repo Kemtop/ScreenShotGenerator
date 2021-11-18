@@ -65,6 +65,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Пустая страница на которую заходит браузер.
         /// </summary>
         public string blankPage { get; set; }
+
+
+        /// <summary>
+        /// Возвращает ошибку.
+        /// </summary>
+        public string lastError { get; }
         public ImpBrowserControlChrome(int pageLoadTimeouts, int javaScriptTimeouts,bool enableLog,int browserId)
         {
             //Путь к рабочей директории приложения.
@@ -181,7 +187,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <param name="url"></param>
         /// <param name="filename"></param>
         /// <returns></returns>
-        public string takeScreenShot(string url, string filePath,string filename,ref float elipsedTime,
+        public int takeScreenShot(string url, string filePath,string filename,ref float elipsedTime,
             ImageSize imgSize,ref UInt32 outSize)
         {
           
@@ -279,10 +285,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Добавить стандартную картинку.
                 String str= "Exception in metod takeScreenShot where save screenshot: " + ex.Message;
                 saveBrowserErrorDg((int)enumBrowserError.ProblemWithBrowser, str, url, filename);
-                return "Error 702";
+                return 0;//"Error 702";
             }
 
-            return null;
+            return 1;
 
         }
 

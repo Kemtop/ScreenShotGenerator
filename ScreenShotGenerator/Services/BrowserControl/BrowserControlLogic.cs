@@ -33,6 +33,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
     public delegate void BrowserEndLife(int BrowserId);
 
     /// <summary>
+    /// Делегат события смерти браузера(например система убила процесс).
+    /// </summary>
+    public delegate void browserDie(int browserId);
+
+    /// <summary>
     /// Логика управления браузером.
     /// </summary>
     public class BrowserControlLogic
@@ -100,14 +105,21 @@ namespace ScreenShotGenerator.Services.BrowserControl
         public int browserRestartAfterScreens;
 
         /// <summary>
+        /// Флаг отправки события завершения жизненного цикла. Событие отправляется единоразово.
+        /// </summary>
+        private bool callEndLifeTime;
+
+        /// <summary>
         ///Событие по завершению жизненного цикла, исчерпания лимита по выполнению скриншотов.
         /// </summary>
         /// <returns></returns>
         public event BrowserEndLife endLife;
+
         /// <summary>
-        /// Флаг отправки события завершения жизненного цикла. Событие отправляется единоразово.
+        /// Событие потери связи с браузером(он сам вылетел или система ему помогла).
         /// </summary>
-        private bool callEndLifeTime;
+        public event browserDie eventBrowserDie;
+  
 
         /// <summary>
         /// Запущен процесс завершения работы браузера.
@@ -216,7 +228,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Проверка лимита на выполнение скриншотов,и генерация событий.
                 checkLifeTime();
 
-
                 foreach (mJobPool p in data)
                 {
                     //Сервис останавливают. Выходим.
@@ -230,17 +241,41 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         continue;
                     }
 
-                    String lastError; //Последнее сообщение об ошибке, если есть.
+                    String lastError=""; //Последнее сообщение об ошибке, если есть.
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
                     //Путь куда сохранять файл.
                     string filePath = Path.Combine("wwwroot/" + tmpDir, p.fileName);
 
-
                     //Cоздание скриншота.
-                    // Log.Information("take "+p.url+";Browser="+browserId.ToString());                  
-                    string err = Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime, p.imageSize,
+                    int answ=Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime, p.imageSize,
                         ref p.fileSize);
-                    //Log.Information("size="+outSize.ToString());
+                   
+                    //Browser die.
+                    if(answ==-1)
+                    {
+                        //Устанавливаем выполняемым задачам статус "Новая".
+                        foreach (mJobPool t in data)
+                        {
+                            if(t.status==(int)enumTaskStatus.LockByBrowser)
+                            t.status = (int)enumTaskStatus.NewTask;
+                        }
+                                                
+                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, "Browser DIE!", p.url, p.fileName);
+                        eventBrowserDie(browserId);
+                        Browser.quit(); //Останавливаю то что осталось от браузера(драйвер).                       
+                        return;
+                    }
+
+                    //Пустой объект screenShot.Проблеммы с сайтом.
+                    if(answ == -2)
+                    {
+                        p.status = (int)enumTaskStatus.End;
+                        p.fileName = UrlErrorImg.badImg;
+                        //Формирую событие по окончанию выполнения задачи.
+                        finishedJob(p.requestId); //Передаю идентификатор http запроса.
+                        continue;
+                    }    
+
 
                     //Сервис останавливают. Выходим. Браузер мог вообще упасть и вернуть сообщение об ошибке.
                     if (!threadIsRun) return;
@@ -249,17 +284,17 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                     bool allGood; //Нет ошибок в процессе работы.
 
-                    //Ошибка создания скрин шота.
-                    if (err != null)
+                    //Ошибка сервиса.
+                    if (answ == 0)
                     {
-                        lastError = err;
                         allGood = false;
-                    }
+                        lastError = Browser.lastError; //Получаю ошибку сервиса.
+                    }                       
                     else
                     {
                         // Проверяет итоговый файл на существование, на размер,
                         // и на заполнение только белым или только черным.
-                        allGood = checkResultFile(out lastError, filePath);
+                        allGood = checkResultFile(out lastError, filePath,p.url);
                     }
 
 
@@ -271,19 +306,29 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     else
                     {
                         p.status = (int)enumTaskStatus.Error;
-                        p.fileName = lastError;
+                        p.fileName = "Error 700."; //В запросе всегда будет одна и та же ошибка.
                         //Сохраняю логи в БД.
                         saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, lastError, p.url, p.fileName);
                     }
 
                     //Формирую событие по окончанию выполнения задачи.
                     finishedJob(p.requestId); //Передаю идентификатор http запроса.
-
-                    countScreenShots++;
+                    countComplatedTasks(); //Увеличивает счетчик скриншоттов.
                 }
 
 
             }
+        }
+
+        /// <summary>
+        /// Увеличивает счетчик скриншоттов.
+        /// </summary>
+        private void countComplatedTasks()
+        {
+            if (countScreenShots < int.MaxValue)
+                countScreenShots++;
+            else
+                countScreenShots = 0;
         }
 
         /// <summary>
@@ -298,7 +343,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 string errMsg = "Error:Empty url!";
                 p.status = (int)enumTaskStatus.End;
                 p.fileName = UrlErrorImg.badUrl;
-                //Сохраняю логи в БД.
+                //Cохраняю логи в БД.
                 saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
                 return false;
             }
@@ -325,11 +370,10 @@ namespace ScreenShotGenerator.Services.BrowserControl
             catch
             {
                 //Проблемы с адресом.
-                string errMsg = "Error:dnsNotFound!";
                 p.status = (int)enumTaskStatus.End;
                 p.fileName = UrlErrorImg.badUrl;
-                //Сохраняю логи в БД.
-                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
+                // string errMsg = "Error:dnsNotFound!"; //Не будем засорять лог.
+                //saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
                 return false;
             }
 
@@ -355,24 +399,34 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <param name="errMess"></param>
         /// <param name="pathToFile"></param>
         /// <returns></returns>
-        private static bool checkResultFile(out string errMess, string pathToFile)
+        private static bool checkResultFile(out string errMess, string pathToFile,string url)
         {
             errMess = null;
-
-            //Почему то файл не создался. 
-            if (!checkExistFile(pathToFile))
+            int countOperation = 1; //Счетчик операций, для определения на какой возникло исключение.
+            try
             {
-                errMess = "File no exist.";
+                //Почему то файл не создался. 
+                if (!checkExistFile(pathToFile))
+                {
+                    errMess = "File no exist.";
+                    return false;
+                }
+                countOperation++;
+
+                //Почему то файл пуст.
+                if (!checkFileSize(pathToFile))
+                {
+                    errMess = "File length is 0.";
+                    return false;
+                }
+            }
+            catch(Exception ex)
+            {
+                errMess = "Exception in checkResultFile(step="+ countOperation.ToString()+ ";url="+url
+                    +"):"+ ex.Message;
                 return false;
             }
-
-
-            //Почему то файл пуст.
-            if (!checkFileSize(pathToFile))
-            {
-                errMess = "File length is 0.";
-                return false;
-            }
+                       
 
             /*
             //Проверяет не вернул ли браузер черную или белую картинку.
