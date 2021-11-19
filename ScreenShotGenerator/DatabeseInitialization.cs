@@ -76,11 +76,13 @@ namespace ScreenShotGenerator
         {
             Dictionary<string, string> settings = new Dictionary<string, string>();
             settings.Add("poolBrowserSize", "1");
-            settings.Add("browserTasksPerThread", "5");
+            settings.Add("browserTasksPerThread", "1");
             settings.Add("clearCashInterval", "24");
-           
+            settings.Add("averageTimeRequest", "2");
+            settings.Add("browserMax", "2");
+
             //Добавление в БД.
-            foreach(KeyValuePair<string,string> item in settings )
+            foreach (KeyValuePair<string,string> item in settings )
             {
                 mServiceSettings m = new mServiceSettings();
                 m.Name = item.Key;

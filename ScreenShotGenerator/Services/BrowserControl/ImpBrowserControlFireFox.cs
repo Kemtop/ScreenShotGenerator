@@ -4,6 +4,7 @@ using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Firefox;
 using OpenQA.Selenium.Interactions;
+using OpenQA.Selenium.Support.UI;
 using ScreenShotGenerator.Services.Models;
 using ScreenShotGenerator.Services.ScreenShoterPools;
 using Serilog;
@@ -12,6 +13,7 @@ using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -149,7 +151,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Отключить загрузку файлов.
                 //Путь к исполняемому файлу драйвера должен быть установлен системным свойством
                 Browser = new FirefoxDriver(options);
-
+                     
 
                 //В процессе тестов встретились сайты загрузка которых "крутиться" более минуты, что приводит
                 //к тайм ауту взаимодействия с драйвером. Исключаем такую ситуацию.
@@ -169,7 +171,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
 
-            Log.Information("Run FireFox.");
+            
+            Log.Information("Run FireFox. Control Module Version 1.07.");
             return true;
         }
  
@@ -185,9 +188,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
             ImageSize imgSize, ref UInt32 outSize)
         {
             bool hasException = false; //Были ли исключения?
-                       
-            //Закрывает старую вкладку, открывает новую. Возвращаю false если браузер перестал отвечать.
-            if(!reopenWindow()) return -1; //Браузер не работает.
 
             //Переход на пустую страницу для исключения ситуации когда новый сайт по особенному долго
             //грузиться и в итоге получается скрин старого сайта.
@@ -463,6 +463,120 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 Browser.SwitchTo().Window(brWindow[0]); //Переключаюсь на первую.
             }
         }
+
+        private void InstallAddons()
+        {
+            //Путь к рабочей директории приложения.
+            string path = curentDirectory + @"\firefoxAddons.txt";
+            bool exists = System.IO.File.Exists(path);
+            if(!exists)
+            {
+                //Попытка установить расширение.
+                if (!InstallAddon("https://addons.mozilla.org/en-US/firefox/addon/adblock-plus/")) return; 
+
+                using (StreamWriter writer = System.IO.File.CreateText(path))
+                {
+                    writer.WriteLine("Install AddBlock");
+                }
+            }
+        }
+
+
+        bool IsAlertShown(IWebDriver driver)
+        {
+            try
+            {
+                Thread.Sleep(300);
+                driver.SwitchTo().Alert();
+            }
+            catch (NoAlertPresentException e)
+            {
+                return false;
+            }
+            return true;
+        }
+
+
+        /// <summary>
+        /// Удалить.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
+        private bool InstallAddon(string url)
+        {
+            try
+            {
+                Log.Information("Install Addons.");
+                Browser.Navigate().GoToUrl(url);
+                Log.Information("Browser in " + url);
+
+
+                string currentHandle = Browser.CurrentWindowHandle;
+                ReadOnlyCollection<string> originalHandles = Browser.WindowHandles;
+
+                //Вызываю всплывающее окно.
+                Browser.FindElement(By.XPath(@"//a[text()='Add to Firefox']")).Click();
+
+                // WebDriverWait.Until <T> ждет, пока делегат не вернется
+                // ненулевое значение для типов объектов. Мы можем использовать это
+                // поведение для возврата дескриптора всплывающего окна.
+                WebDriverWait wait = new WebDriverWait(Browser, TimeSpan.FromSeconds(60));
+                string popupWindowHandle = wait.Until<string>((d) =>
+                {
+                    string foundHandle = null;
+
+                    // Вычтите список известных дескрипторов. В случае одиночного
+                    // всплывающее окно, список newHandles будет иметь только одно значение.
+                    List<string> newHandles = Browser.WindowHandles.Except(originalHandles).ToList();
+                    if (newHandles.Count > 0)
+                    {
+                        foundHandle = newHandles[0];
+                    }
+
+                    return foundHandle;
+                });
+
+                Browser.SwitchTo().Window(popupWindowHandle);
+                Browser.FindElement(By.XPath(@"//a[text()='Добавить']")).Click();
+
+                // Do whatever you need to on the popup browser, then...
+                Browser.Close();
+                Browser.SwitchTo().Window(currentHandle);
+
+
+                /*
+                 * 
+                 * 
+                 * 
+                //@"//button[text()='Add to Firefox']
+                Browser.FindElement(By.XPath(@"//a[text()='Add to Firefox']")).Click();
+                // find_element_by_xpath('//span[text()="OK"]').click()
+                //Ждем всплывающее окно.
+                Log.Information("Wait alert window.." + url);
+
+              
+
+
+                WebDriverWait wait = new WebDriverWait(Browser, TimeSpan.FromSeconds(60));
+                wait.Until(Browser => IsAlertShown(Browser));
+                IAlert alert = Browser.SwitchTo().Alert();
+                alert.Accept();
+                */
+                Log.Information("Install Addons complated!");
+
+            }
+            catch(Exception ex)
+            {
+                SaveBrowserError("Can't install Addons", ex.Message, url, " ");
+                Log.Error(ex.Message);
+                return false;
+            }
+
+            return true; 
+        }
+
+
+
     }
 }
 

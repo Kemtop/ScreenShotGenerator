@@ -13,15 +13,29 @@ namespace ScreenShotGenerator.Models
         /// </summary>
         [Required]
         [Range(1, 99999)]
-        public int clearCashInterval { get; set; }
+        public int clearCacheInterval { get; set; }
 
         /// <summary>
         /// Количество работающих браузеров.
         /// </summary>
         [Required]
         [Range(1, 20)]
-        public int browserAmount { get; set; }
+        public int browserMin { get; set; }
 
+        /// <summary>
+        /// Максимальное количество работающих браузеров.
+        /// </summary>
+        [Required]
+        [Range(1, 20)]
+        public int browserMax { get; set; }
+
+        /// <summary>
+        ///Среднее время выполнения запроса (по практике).
+        /// </summary>
+        [Required]
+        [Range(1, 20)]
+        public int averageTimeRequest { get; set; }
+        
         /// <summary>
         /// Количество задач обрабатываемых одним браузером.
         /// </summary>
@@ -54,5 +68,14 @@ namespace ScreenShotGenerator.Models
         /// </summary>
         public int cacheFilesSize { get; set; }
 
+        /// <summary>
+        /// Количество работающих браузеров(на текущий момент);
+        /// </summary>
+        public int browserCount { get; set; }
+
+        /// <summary>
+        /// Среднее время выполнения запроса.
+        /// </summary>
+        public string avgTimeRequest { get; set; }
     }
 }

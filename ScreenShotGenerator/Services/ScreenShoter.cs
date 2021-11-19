@@ -57,8 +57,14 @@ namespace ScreenShotGenerator.Services
         int browserTasksPerThread = 5; //Количество задач из пула которые браузер обрабатывает за раз.
         int clearCashInterval = 10; //Интервал очистки кеша, в часах.
 
-        int averageTime = 2; // Среднее время выполнения запроса (по практике)
-        int maxCountBrowser = 5; // Максимальное кол-во запущенных браузеров
+        /// <summary>
+        ///  Среднее время выполнения запроса.
+        /// </summary>
+        int averageTime = 2; 
+        /// <summary>
+        /// Максимальное кол-во запущенных браузеров
+        /// </summary>
+        int maxCountBrowser = 5;
 
         /// <summary>
         /// Включает чтение кеши из базы данных при запуске сервиса.
@@ -174,13 +180,16 @@ namespace ScreenShotGenerator.Services
         public SystemSettingModel getSettings()
         {
             SystemSettingModel m = new SystemSettingModel();
-            m.browserAmount = poolBrowserSize;  //Количество запущенных браузеров.
+            m.browserMin = poolBrowserSize;  //Количество запущенных браузеров.
+            m.browserMax = maxCountBrowser;
+            m.averageTimeRequest = averageTime;
             m.tasksAmount = browserTasksPerThread; //Количество задач из пула которые браузер обрабатывает за раз.
-            m.clearCashInterval = clearCashInterval; //Интервал очистки кеша, в часах.
+            m.clearCacheInterval = clearCashInterval; //Интервал очистки кеша, в часах.
             m.cacheElementsCnt = Cache.Count();
 
             //Количество элементов обрабатываемых на данный момент.
             m.curentElementsInProcessCnt = poolTask.curentElementsInProcessCnt();
+            m.browserCount = browserPool.browserCount();
 
             return m;
         }
@@ -732,7 +741,9 @@ namespace ScreenShotGenerator.Services
             settings.Add("poolBrowserSize", "");
             settings.Add("browserTasksPerThread", "");
             settings.Add("clearCashInterval", "");
-
+            settings.Add("averageTimeRequest", "");
+            settings.Add("browserMax", "");
+            
             return settings;
         }
 
@@ -759,6 +770,9 @@ namespace ScreenShotGenerator.Services
                 browserTasksPerThread = Convert.ToInt32(settings["browserTasksPerThread"]);
                 //Интервал очистки кеша, в часах.
                 clearCashInterval = Convert.ToInt32(settings["clearCashInterval"]);
+
+                maxCountBrowser= Convert.ToInt32(settings["browserMax"]);
+                averageTime= Convert.ToInt32(settings["averageTimeRequest"]);
             }
 
         }
@@ -773,9 +787,11 @@ namespace ScreenShotGenerator.Services
             Dictionary<string, string> settings = returnSettingsName();
 
             //Передаю  новые значения.
-            settings["poolBrowserSize"] = m.browserAmount.ToString();  //Количество запущенных браузеров.
+            settings["poolBrowserSize"] = m.browserMin.ToString();  //Количество запущенных браузеров.
             settings["browserTasksPerThread"] = m.tasksAmount.ToString(); //Количество задач из пула которые браузер обрабатывает за раз.
-            settings["clearCashInterval"] = m.clearCashInterval.ToString(); //Интервал очистки кеша, в часах.
+            settings["clearCashInterval"] = m.clearCacheInterval.ToString(); //Интервал очистки кеша, в часах.
+            settings["browserMax"] = m.browserMax.ToString();
+            settings["averageTimeRequest"] = m.averageTimeRequest.ToString();
 
             using (var scope = scopeFactory.CreateScope())
             {
@@ -793,9 +809,11 @@ namespace ScreenShotGenerator.Services
             }
 
             //Передаю настройки.
-            poolBrowserSize = m.browserAmount; //Количество запущенных браузеров.
+            poolBrowserSize = m.browserMin; //Количество запущенных браузеров.
             browserTasksPerThread = m.tasksAmount; //Количество задач из пула которые браузер обрабатывает за раз.
-            clearCashInterval = m.clearCashInterval; //Интервал очистки кеша, в часах.
+            clearCashInterval = m.clearCacheInterval; //Интервал очистки кеша, в часах.
+            maxCountBrowser=m.browserMax;
+            averageTime=m.averageTimeRequest;
         }
 
         /// <summary>

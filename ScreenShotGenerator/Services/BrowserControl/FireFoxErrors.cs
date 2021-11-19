@@ -28,6 +28,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             "InsecureCertificate",
             "Reached error page: about:neterror"
         };
+        //TimedPromise timed out after 8000 m
 
 
         /// <summary>
