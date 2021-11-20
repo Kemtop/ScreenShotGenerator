@@ -75,6 +75,22 @@ namespace ScreenShotGenerator.Services
         /// <returns></returns>
         List<mCacheRam> getCacheItems(int lastCnt);
 
+        /// <summary>
+        /// Количество объектов в памяти.
+        /// </summary>
+        /// <returns></returns>
+        int CacheItemsCount();
+
+        /// <summary>
+        /// Имена объектов на диске.
+        /// </summary>
+        /// <returns></returns>
+        List<mImageList> DiskItems();
+
+        /// <summary>
+        /// Запуск процесса очистки.
+        /// </summary>
+        void RunCleaning(List<mImageList> diskItems);
 
         /// <summary>
         /// Возвращает размер файлов во временной папке в Мб.

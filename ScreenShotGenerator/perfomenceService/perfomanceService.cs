@@ -90,10 +90,11 @@ namespace ScreenShotGenerator.perfomenceService
         private async Task monitoringPerfomances(CancellationToken cancellationToken)
         {
             Log.Information("Run service monitoring perfomaces.");
-
+            /*
             Log.Information("Monitoring disable by programmer!");
             int y = 10; //Временная отладка.
             if (y == 10) return;
+            */
 
             while (!cancellationToken.IsCancellationRequested)
             {                

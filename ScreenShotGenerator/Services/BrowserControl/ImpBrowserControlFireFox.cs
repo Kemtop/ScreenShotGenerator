@@ -243,7 +243,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     }
 
                     //Браузер умер.
-                    if(ExceptionMessage.Contains(FireFoxErrors.lossConnection))
+                    if(FireFoxErrors.browserBroken(ExceptionMessage))
                     {
                         SaveBrowserError("Exception to GetScreenshot: Browser Die.", ExceptionMessage, url, filename);
                         return -1;
@@ -310,7 +310,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 hasException = true;
    
                 //Браузер умер.
-                if (ExceptionMessage.Contains(FireFoxErrors.lossConnection))
+                if (FireFoxErrors.browserBroken(ExceptionMessage))
                 {
                     SaveBrowserError("Exception to GetScreenshot: Browser Die.", ExceptionMessage, url, filename);
                     return false;
@@ -335,7 +335,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             try
             {
-                Browser.SwitchTo().Alert().Accept(); //Закрываю алерт окно, и повторно пытаюсь сделать скрин.
+                Browser.SwitchTo().Alert().Dismiss();//  Accept(); //Закрываю алерт окно, и повторно пытаюсь сделать скрин.
             }
            catch(Exception ex)
             {
@@ -374,7 +374,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
             catch (Exception ex)
             {
-                if (ex.Message.Contains(FireFoxErrors.lossConnection)) return false;
+                if (FireFoxErrors.browserBroken(ex.Message)) return false;
                 SaveBrowserError("Exception in reopenWindow:", ex.Message, " ", " ");
             }
 

@@ -15,10 +15,34 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public static string  userPromtDialog = "Dismissed user prompt dialog";
 
+      
         /// <summary>
-        /// Потеря связи с браузером. Очевидно его убила система.
+        /// Список сообщений свидетельствующих о выходе браузера из строя.
+        /// </summary>        
+        private static string[] brokenMessages =
+        {
+            "Tried to run command without establishing a connectio",
+            "timed out after 60 seconds"
+        };
+
+
+        /// <summary>
+        /// На основании сообщения определяет не сломался ли браузер.true-сломался.
         /// </summary>
-        public static string lossConnection = "Tried to run command without establishing a connectio";
+        /// <param name="msg"></param>
+        /// <returns></returns>
+        public static bool browserBroken(string msg)
+        {
+            foreach (string s in brokenMessages)
+            {
+                if (msg.Contains(s))
+                    return true;
+            }
+            return false;
+        }
+
+
+
 
         /// <summary>
         /// Не критические ошибки при загрузке страницы.

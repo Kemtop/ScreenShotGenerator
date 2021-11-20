@@ -233,6 +233,7 @@ firefox
 ublock
 https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/
 Скрываем содержимое начальных вкладок.
+pupup blocked unlimite
 Ctrl+W закрыть вкладки браузера.
 
 Для остановки

@@ -65,20 +65,7 @@ namespace ScreenShotGenerator.Controllers
         public IActionResult CashImages()
         {
             //Получение списка имен файлов.
-            string dirPath = @"wwwroot/imgCache";
-            //var directory 
-            IEnumerable<string> listNames = Directory
-            .GetFiles(dirPath, "*", SearchOption.TopDirectoryOnly)
-            .Select(f => Path.GetFileName(f));
-
-
-            List<mImageList> fileNames = new List<mImageList>();
-            foreach (string str in listNames)
-            {
-                fileNames.Add(new mImageList() { name = "/imgCache/" + str }); ;
-            }
-
-
+            List<mImageList> fileNames = _screenShoter.DiskItems();
 
             return View(fileNames);
         }
@@ -164,13 +151,38 @@ namespace ScreenShotGenerator.Controllers
             return View(model);
         }
 
-
+        /// <summary>
+        /// Нажатие на кнопку перезапустить браузеры.
+        /// </summary>
+        /// <param name="button"></param>
+        /// <returns></returns>
         public IActionResult rebootBrowser(string button)
         {
             //Перезапуск сервиса.
             _screenShoter.restartService();
             return View();
         }
+
+        /// <summary>
+        /// Нажатие на кнопку очистить кэш.
+        /// </summary>
+        /// <param name="button"></param>
+        /// <returns></returns>
+        public  IActionResult clearCache(string button)
+        {
+            //Получить и показать пользователю количество удаляемых записей на диске и в памяти.
+            ViewBag.cacheItemsCount = _screenShoter.CacheItemsCount();
+            //Получение списка имен файлов.
+            List<mImageList> fileNames = _screenShoter.DiskItems();
+            ViewBag.diskItems = fileNames.Count();
+
+            //Запуск процесса удаления данных.
+             Task.Run(()=>_screenShoter.RunCleaning(fileNames));
+                        
+            return View();
+        }
+
+
 
 
         /// <summary>

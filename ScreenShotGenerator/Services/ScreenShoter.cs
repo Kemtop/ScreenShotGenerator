@@ -287,7 +287,38 @@ namespace ScreenShotGenerator.Services
         }
 
 
+        /// <summary>
+        /// Количество объектов в памяти.
+        /// </summary>
+        /// <returns></returns>
+        public  int CacheItemsCount()
+        {
+            return Cache.Count();
+        }
 
+        /// <summary>
+        /// Количество объектов на диске.
+        /// </summary>
+        /// <returns></returns>
+        public List<mImageList> DiskItems()
+        {
+            //Получение списка имен файлов.
+            string dirPath = @"wwwroot/imgCache";
+            //var directory 
+            IEnumerable<string> listNames = Directory
+            .GetFiles(dirPath, "*", SearchOption.TopDirectoryOnly)
+            .Select(f => Path.GetFileName(f));
+
+            List<mImageList> fileNames = new List<mImageList>();
+            foreach (string str in listNames)
+            {
+                //Пропускаю системные файлы.
+                if (UrlErrorImg.IsSystemErrorPage(str)) continue;
+                fileNames.Add(new mImageList() { name = "/imgCache/" + str }); ;
+            }
+
+            return fileNames;
+        }
 
         /// <summary>
         /// Обработчик события по завершению каким либо браузером задачи(сделал скриншот).
@@ -825,6 +856,33 @@ namespace ScreenShotGenerator.Services
             return poolTask.waitTasksCnt();
         }
 
+
+        /// <summary>
+        /// Запуск процесса очистки при нажатии на кнопку.
+        /// </summary>
+        void RunCleaning(List<mImageList> diskItems)
+        {
+            //Удаление файлов на диске.
+            Log.Information("Run cleaning by user.");
+            Log.Information("Delete from disk.");
+
+            foreach (mImageList f in diskItems)
+            {
+                try
+                {
+                    var path = Path.Combine(@"wwwroot/",f.name);
+                    File.Delete(path);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Error where delete " + f.name + " from disk. Exception:" + ex.Message);
+                }
+            }
+
+            Log.Information("Delete from memory.");
+            Cache.clearAll();
+            Log.Information("End cleaning.");
+        }
 
         /// <summary>
         /// Удаляет выполненные задачи из пула.

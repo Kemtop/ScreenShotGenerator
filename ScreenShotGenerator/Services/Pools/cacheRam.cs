@@ -89,6 +89,18 @@ namespace ScreenShotGenerator.Services.ScreenShoterPools
             }
         }
 
+        /// <summary>
+        /// Удаляет все записи.
+        /// </summary>
+        /// <returns></returns>
+        public void clearAll()
+        {
+            lock (lockCachePool)
+            {
+                cache.Clear();
+            }
+        }
+
 
         /// <summary>
         /// Удаляет записи, которые хранились более  hour часов.
