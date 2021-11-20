@@ -860,26 +860,30 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Запуск процесса очистки при нажатии на кнопку.
         /// </summary>
-        void RunCleaning(List<mImageList> diskItems)
+        public void RunCleaning(List<mImageList> diskItems)
         {
             //Удаление файлов на диске.
             Log.Information("Run cleaning by user.");
-            Log.Information("Delete from disk.");
+            Log.Information("Delete from disk "+diskItems.Count()+" items.");
+
+            string curentDirectory = Directory.GetCurrentDirectory();
+            string rootDir=Path.Combine(curentDirectory,@"wwwroot");
 
             foreach (mImageList f in diskItems)
             {
+                string path = rootDir+f.name;
                 try
-                {
-                    var path = Path.Combine(@"wwwroot/",f.name);
+                {                  
                     File.Delete(path);
                 }
                 catch (Exception ex)
                 {
-                    Log.Error("Error where delete " + f.name + " from disk. Exception:" + ex.Message);
+                    Log.Error("Error where delete " + path + " from disk. Exception:" + ex.Message);
+                    return;
                 }
             }
 
-            Log.Information("Delete from memory.");
+            Log.Information("Delete from memory " + Cache.Count().ToString() + " items.");
             Cache.clearAll();
             Log.Information("End cleaning.");
         }

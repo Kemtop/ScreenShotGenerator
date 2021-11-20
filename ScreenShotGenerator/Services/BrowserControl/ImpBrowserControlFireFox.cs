@@ -78,8 +78,24 @@ namespace ScreenShotGenerator.Services.BrowserControl
             curentDirectory = Directory.GetCurrentDirectory();
             this.pageLoadTimeouts = pageLoadTimeouts;
             this.javaScriptTimeouts = javaScriptTimeouts;
+
+            //Тест
+            
+            bool exists = System.IO.File.Exists(getAlertPathFile());
+            if (!exists)
+            {
+                using (StreamWriter writer = System.IO.File.CreateText(getAlertPathFile()))
+                {
+                    writer.WriteLine("------------------");
+                }
+            }
         }
         
+
+        string getAlertPathFile()
+        {
+            return curentDirectory + @"/alerts.txt";
+        }
 
         /// <summary>
         /// Считываю из appsettings.json опции браузера.
@@ -230,6 +246,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     //Появилось alert окно.
                     if (ExceptionMessage.Contains(FireFoxErrors.userPromtDialog))
                     {
+                        
+                        using (StreamWriter w = File.AppendText(getAlertPathFile()))
+                        {
+                            w.WriteLine(url);
+                        }
+                        return -2;
+
+                        /*
                         if (retryCnt > 10)//Слишком много попыток.
                         {
                             SaveBrowserError("Too many try close alerts for url=" + url, " ", url," ");
@@ -239,7 +263,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         aceeptAlert(url);
                         Thread.Sleep(800);//Жду может что то под грузится.
                         retryCnt++;
-                        continue;
+                        continue;*/
                     }
 
                     //Браузер умер.
