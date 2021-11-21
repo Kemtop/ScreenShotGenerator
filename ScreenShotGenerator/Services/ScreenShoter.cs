@@ -421,7 +421,9 @@ namespace ScreenShotGenerator.Services
             //Запущен процесс перезапуска браузеров.
             if (browserReboot) return false; 
 
-                int realWorkBrowser = browserPool.browserCount(); //Реальное кол-во запущенных браузеров
+            int realWorkBrowser = browserPool.browserCount(); //Реальное кол-во запущенных браузеров
+            if (realWorkBrowser == 0) return false; //Еще не запустились, а запросы пришли. 
+
             // Проверяем необходимость запуска доп. браузеров
             if (needBrowserCount > realWorkBrowser)
             {

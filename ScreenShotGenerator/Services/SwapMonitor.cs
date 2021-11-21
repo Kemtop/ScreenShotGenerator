@@ -26,7 +26,7 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Лимит свопа для процесса, после которого генерируется событие.
         /// </summary>
-         private static UInt32 swapLimit = 100000;//~100Мб 
+         private static UInt32 swapLimit = 50000;//~100Мб 
 
         /// <summary>
         /// Интервал мониторинга.
@@ -272,6 +272,8 @@ namespace ScreenShotGenerator.Services
                             string pid = "";
                             string swap = "";
 
+                            TherapyScriptOutPut(ref line); //Лечение аномалии.
+
                             //Обрабатываю строку ответа. Сохраняю если есть данные.
                             if (getPidFromSwapInfo(ref line, procName, ref pid, ref swap))
                             {
@@ -295,6 +297,9 @@ namespace ScreenShotGenerator.Services
             return swapData;
         }
 
+        //
+
+
         /// <summary>
         /// Удаляет шапку вывода.
         /// </summary>
@@ -305,6 +310,24 @@ namespace ScreenShotGenerator.Services
             int pos = ret.IndexOf("SWAP");
             return ret.Substring(pos + 4);
         }
+
+        /// <summary>
+        /// Лечение аномальных пробелов в выводе Web              Content258579  337680  kB.
+        /// </summary>
+        /// <param name="line"></param>
+        /// <returns></returns>
+        private void TherapyScriptOutPut(ref string line)
+        {
+            if(line.Contains("Web")&& line.Contains("Content"))
+            {
+                int pos = line.IndexOf("Content");
+                string tmp = line.Substring(pos);//Отрезаю значения.
+                line = "Web " + tmp; //Превращаю строку в нормальный вид.
+                Log.Information("TherapyScriptOutPut="+line);
+            }
+
+        }
+
 
         /// <summary>
         /// Из строки получает данные.

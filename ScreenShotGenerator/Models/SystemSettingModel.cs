@@ -39,8 +39,6 @@ namespace ScreenShotGenerator.Models
         /// <summary>
         /// Количество задач обрабатываемых одним браузером.
         /// </summary>
-        [Required]
-        [Range(1, 100000)]
         public int tasksAmount { get; set; }
 
         /// <summary>
