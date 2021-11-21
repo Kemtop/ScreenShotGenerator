@@ -65,6 +65,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Пустая страница на которую заходит браузер.
         /// </summary>
         public string blankPage { get; set; }
+
+        /// <summary>
+        /// Последний url на который ходил браузер.
+        /// </summary>
+        private string lastUrl;
                 
         /// <summary>
         /// Возвращает ошибку.
@@ -188,7 +193,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
 
             
-            Log.Information("Run FireFox. Control Module Version 1.07.");
+            Log.Information("Run FireFox. Control Module Version 1.08.");
             return true;
         }
  
@@ -213,7 +218,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
             if(hasException) 
             {
                 SaveBrowserError("Warning:" +
-                    "Time out on blank page:", lastError, url, filename); //Сохраняю в лог.
+                    "Time out on blank page after(last url="+ lastUrl 
+                    + ",curent url:"+url+") :", lastUrl,lastError, filename); //Сохраняю в лог.
                 Thread.Sleep(500); //Может это поможет.
             }
 
@@ -251,9 +257,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         {
                             w.WriteLine(url);
                         }
-                        return -2;
+                        //return -2;
 
-                        /*
+                        
                         if (retryCnt > 10)//Слишком много попыток.
                         {
                             SaveBrowserError("Too many try close alerts for url=" + url, " ", url," ");
@@ -263,7 +269,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         aceeptAlert(url);
                         Thread.Sleep(800);//Жду может что то под грузится.
                         retryCnt++;
-                        continue;*/
+                        continue;
                     }
 
                     //Браузер умер.
@@ -299,7 +305,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                 //Проверка наличия открытых нескольких окон.И их закрытие. Если этого не делать,страницы складываются
                 //в swap, что приводит к его переполнению.
-                checkManyOpenWindows(url);
+                 checkManyOpenWindows(url);
             }
             catch (Exception ex)
             {
@@ -308,8 +314,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 SaveBrowserError(lastError, "", url, filename);
                 return 0;
             }
-
-       
+            //Последний URL на который ходил браузер.
+            lastUrl = url;
             return 1;
         }
 

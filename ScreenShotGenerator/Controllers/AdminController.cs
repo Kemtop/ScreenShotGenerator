@@ -168,7 +168,7 @@ namespace ScreenShotGenerator.Controllers
         /// </summary>
         /// <param name="button"></param>
         /// <returns></returns>
-        public  IActionResult clearCache(string button)
+        public  IActionResult clearCache()
         {
             //Получить и показать пользователю количество удаляемых записей на диске и в памяти.
             ViewBag.cacheItemsCount = _screenShoter.CacheItemsCount();
@@ -182,7 +182,17 @@ namespace ScreenShotGenerator.Controllers
             return View();
         }
 
-
+        /// <summary>
+        /// Очистка ошибок браузера.
+        /// </summary>
+        /// <param name="button"></param>
+        /// <returns></returns>
+        public IActionResult clearBrowserError()
+        {
+            //Запуск процесса удаления данных.
+            Task.Run(() => _screenShoter.ClearBrowserErrors());
+            return View();
+        }
 
 
         /// <summary>

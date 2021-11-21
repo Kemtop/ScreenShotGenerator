@@ -112,6 +112,11 @@ namespace ScreenShotGenerator.Services
         private UInt32 cacheRemainingSize;
 
         /// <summary>
+        /// Запущен процесс перезапуска браузеров. Флаг блокирующий автоматический алгоритм открытия новых.
+        /// </summary>
+        private bool browserReboot;
+
+        /// <summary>
         /// Начат процесс принудительной чистки кеша.
         /// </summary>
         private bool beginForciblyCleanCaсhe;
@@ -247,16 +252,19 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Перезапускает службу.
         /// </summary>
-        public async void restartService()
+        public void restartService()
         {
+            browserReboot = true; //Блокирую алгоритм открытия новых браузеров, при новом запросе.
             stopBrowserPool();
             //Останавливает все задачи в пуле, закрывает браузеры.
             int delay = 10000;
             Log.Information("Waiting " + (delay / 1000).ToString() + "s"); ;
 
-            await Task.Delay(delay);
+             Thread.Sleep(delay);
             runTasks();
             Log.Information("Service is restarted.");
+
+            browserReboot = false; //Разблокирую алгоритм открытия новых браузеров, при новом запросе.
         }
 
 
@@ -320,6 +328,36 @@ namespace ScreenShotGenerator.Services
             return fileNames;
         }
 
+
+        /// <summary>
+        /// Очищает все ошибки брайзера в БД.
+        /// </summary>
+        public void ClearBrowserErrors()
+        {
+            //clearCashInterval в часах.
+            Log.Information("Clear browser error by user.");
+
+            using (var scope = scopeFactory.CreateScope())
+            {
+                ApplicationDbContext dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                //Очистка ошибок браузера, что бы не переполнялось.
+                Log.Information("Clear browser Error in Db.");
+                dbContext.browserErrors.RemoveRange(dbContext.browserErrors);
+
+                try
+                {
+                    dbContext.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Error save Db." + ex.Message);
+                }
+
+            }
+        }
+
+
         /// <summary>
         /// Обработчик события по завершению каким либо браузером задачи(сделал скриншот).
         /// </summary>
@@ -380,7 +418,10 @@ namespace ScreenShotGenerator.Services
                 return false;
             }
 
-            int realWorkBrowser = browserPool.browserCount(); //Реальное кол-во запущенных браузеров
+            //Запущен процесс перезапуска браузеров.
+            if (browserReboot) return false; 
+
+                int realWorkBrowser = browserPool.browserCount(); //Реальное кол-во запущенных браузеров
             // Проверяем необходимость запуска доп. браузеров
             if (needBrowserCount > realWorkBrowser)
             {

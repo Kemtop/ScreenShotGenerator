@@ -97,5 +97,9 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         /// <returns></returns>
         int getTmpDirSize();
+        /// <summary>
+        /// Очищает все ошибки брайзера в БД.
+        /// </summary>
+        void ClearBrowserErrors();
     }
 }

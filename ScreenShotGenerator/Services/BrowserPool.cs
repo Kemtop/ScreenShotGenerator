@@ -41,6 +41,11 @@ namespace ScreenShotGenerator.Services
         private event hasNewJobForBrowsers newJobForBrowser;
 
         /// <summary>
+        /// Монитор свопа.
+        /// </summary>
+        private SwapMonitor swapMonitor;
+
+        /// <summary>
         /// Тайм аут загрузки страницы браузером.
         /// </summary>
         public int pageLoadTimeouts;
@@ -80,9 +85,7 @@ namespace ScreenShotGenerator.Services
         /// Перезагружать браузер после определенного количество скриншотов. 0-не перезагружать.
         /// </summary>
         public int  browserRestartAfterScreens;
-
-        
-
+                
         public BrowserPool(String tmpDir, ref PoolTasks poolTask,BrowserEndJobOnPage OnBrowserTaskCompleted)
         {
             poolBrowserControls = new List<BrowserControlLogic>();
@@ -90,7 +93,8 @@ namespace ScreenShotGenerator.Services
             this.tmpDir = tmpDir;
             this.poolTask = poolTask;
             this.OnBrowserTaskCompleted = OnBrowserTaskCompleted;
-
+            swapMonitor = new SwapMonitor();
+            swapMonitor.SaveCurentPids(); //Сохраняю данные о текущих процессах.
         }
 
         /// <summary>
@@ -162,6 +166,10 @@ namespace ScreenShotGenerator.Services
                     Log.Error("Exception in [createBrowserPool]:" + ex.Message);
                 }
             }
+
+            swapMonitor.eventSwapLimit+=OnEndLifeBrowser; //Если превышен лимит swap.
+            swapMonitor.runMonitoring();//Запускаю мониторинг использования браузерами свопа.
+
         }
 
         /// <summary>
@@ -209,6 +217,8 @@ namespace ScreenShotGenerator.Services
             //Перезагрузить браузер после лимита по количеству скринов.
             Bl.browserRestartAfterScreens = browserRestartAfterScreens;
 
+            //Считывает и сохраняет PID процессов драйвера.
+            swapMonitor.getDriverPids(browserId);
             Bl.processPool(ref poolTask); //Запустить обработку пула задач.
             lock(lockerPool)
             {
