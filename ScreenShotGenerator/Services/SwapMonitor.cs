@@ -276,10 +276,10 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Получает информацию о программах использующих swap.
         /// </summary>
-        public Dictionary<UInt32, UInt32> GetSwapInfo()
+        public List<mSwapInfo> GetSwapInfo()
         {
             //Информация об использовании процессами swap.
-            Dictionary<UInt32, UInt32> swapData = new Dictionary<UInt32, UInt32>();
+            List<mSwapInfo> swapData = new List<mSwapInfo>();
             try
             {
                 string ret = runCommand("./swapMonitoring");
@@ -304,7 +304,11 @@ namespace ScreenShotGenerator.Services
                             //Обрабатываю строку ответа. Сохраняю если есть данные.
                             if (getPidFromSwapInfo(ref line, procName, ref pid, ref swap))
                             {
-                                swapData.Add(Convert.ToUInt32(pid), Convert.ToUInt32(swap));
+                                mSwapInfo sI = new mSwapInfo();
+                                sI.pid = Convert.ToUInt32(pid);
+                                sI.swap = Convert.ToUInt32(swap);
+                                sI.name = procName;
+                                swapData.Add(sI);
                             }
 
                         }
@@ -350,7 +354,6 @@ namespace ScreenShotGenerator.Services
                 int pos = line.IndexOf("Content");
                 string tmp = line.Substring(pos);//Отрезаю значения.
                 line = "Web " + tmp; //Превращаю строку в нормальный вид.
-                Log.Information("TherapyScriptOutPut="+line);
             }
 
         }
@@ -389,28 +392,29 @@ namespace ScreenShotGenerator.Services
         private void Monitor()
         {
             //Получаю информацию о занимаемом пространстве swap процессами.
-            Dictionary<UInt32, UInt32> swapData = GetSwapInfo();
+            List<mSwapInfo> swapData = GetSwapInfo();
             if (swapData == null) return;
             
             //Проверка лимитов.
-            foreach (KeyValuePair<UInt32, UInt32> p in swapData)
+            foreach (mSwapInfo p in swapData)
             {
-                if(p.Value> swapLimit)
+                if(p.swap> swapLimit)
                 {
                     //Ищем процесс с указанным pid.
                     mPidInfo process;
                     lock (lockSystemctlInfo)
                     {
-                      process = SystemctlInfo.Find(x => x.pid == p.Key);
+                      process = SystemctlInfo.FirstOrDefault(x => x.pid == p.pid);
                     }
                         
                     if(process==null)
                     {
-                        Log.Error("Can't found browser with pid=" + p.Key.ToString()+".");
+                        Log.Error("Can't found browser with pid=" + p.pid.ToString()+".");
                         continue;
                     }
 
-                    Log.Information("Swap limit for browserId=" + process.browserId.ToString()+".");
+                    Log.Information("Swap limit for browserId=" + process.browserId.ToString()+
+                        ",process="+p.name+",swap usage(Kb)="+p.swap+".");
                     //Генерирую событие.
                     eventSwapLimit(process.browserId);                    
                 }

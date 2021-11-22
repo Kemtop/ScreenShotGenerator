@@ -147,8 +147,9 @@ namespace ScreenShotGenerator.Services
         public void createPool(int poolBrowserSize)
         {
             //Считываю страницу на которую браузер переходит перед созданием скрина. Говррю что это не url,а html строка.
-             blankPage= "data:text/html;charset=utf-8,"+loadBlankPage();
-            
+            //blankPage= "data:text/html;charset=utf-8,"+loadBlankPage();
+            blankPage = "about:blank";
+
             //Создаю пул браузеров.
             for (int i = 0; i < poolBrowserSize; i++)
             {
