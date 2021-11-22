@@ -44,6 +44,11 @@ namespace ScreenShotGenerator.Services
         private List<mPidInfo> SystemctlInfo;
 
         /// <summary>
+        /// Блокировка для много поточной работы.
+        /// </summary>
+        private object lockSystemctlInfo;
+
+        /// <summary>
         ///Cобытие по превышению лимита swap.
         /// </summary>
         /// <returns></returns>
@@ -51,6 +56,7 @@ namespace ScreenShotGenerator.Services
         public SwapMonitor()
         {
             SystemctlInfo = new List<mPidInfo>();
+            lockSystemctlInfo = new Object();
         }
 
 
@@ -73,8 +79,6 @@ namespace ScreenShotGenerator.Services
                 Monitor();
             }, null, monitoringInterval, monitoringInterval);
         }
-
-
 
 
         /// <summary>
@@ -105,7 +109,12 @@ namespace ScreenShotGenerator.Services
             List<mPidInfo> info = getSystemctlInfo();
 
             //Возвращает новые элементы из info которых нет в SystemctlInfo.
-            IEnumerable<mPidInfo> whichAreNot = info.Except(SystemctlInfo);
+            IEnumerable<mPidInfo> whichAreNot = null;
+            lock (lockSystemctlInfo)
+            {
+                whichAreNot = info.Except(SystemctlInfo);
+            }
+            
             bool hasNew = false;
             if (whichAreNot.Count() > 0)
             {
@@ -117,7 +126,10 @@ namespace ScreenShotGenerator.Services
             foreach (mPidInfo p in whichAreNot)
             {
                 p.browserId = browserId;
-                SystemctlInfo.Add(p);
+                lock (lockSystemctlInfo)
+                {
+                    SystemctlInfo.Add(p);
+                }
                 Log.Information("browserId=" + browserId.ToString() + ";pid:" + p.pid.ToString() + " " + p.sysctlInfo);
             }
 
@@ -127,14 +139,30 @@ namespace ScreenShotGenerator.Services
         }
 
         /// <summary>
+        /// Удаляет все сведения о pid процессов для данного браузера.
+        /// </summary>
+        /// <param name="browserId"></param>
+        public void removePid(int browserId)
+        {
+            lock (lockSystemctlInfo)
+            {
+                SystemctlInfo.RemoveAll(p => p.browserId == browserId);
+            }
+        }
+
+
+        /// <summary>
         /// Отладочный метод. Выводит в лог текущую информацию о процессах.
         /// </summary>
         public void showInfo()
         {
-            foreach (mPidInfo l in SystemctlInfo)
+            lock(lockSystemctlInfo)
             {
-                Log.Information(l.pid.ToString() + "#" + l.browserId.ToString() + "#" + l.sysctlInfo);
-            }
+                foreach (mPidInfo l in SystemctlInfo)
+                {
+                    Log.Information(l.pid.ToString() + "#" + l.browserId.ToString() + "#" + l.sysctlInfo);
+                }
+            }           
         }
 
         /// <summary>
@@ -267,12 +295,11 @@ namespace ScreenShotGenerator.Services
                     //Есть ли в свопе наши процессы?
                     foreach (string procName in browserProcesseNames)
                     {
+                        TherapyScriptOutPut(ref line); //Лечение аномалии.
                         if (line.Contains(procName))
                         {
                             string pid = "";
                             string swap = "";
-
-                            TherapyScriptOutPut(ref line); //Лечение аномалии.
 
                             //Обрабатываю строку ответа. Сохраняю если есть данные.
                             if (getPidFromSwapInfo(ref line, procName, ref pid, ref swap))
@@ -371,7 +398,12 @@ namespace ScreenShotGenerator.Services
                 if(p.Value> swapLimit)
                 {
                     //Ищем процесс с указанным pid.
-                    mPidInfo process = SystemctlInfo.Find(x => x.pid==p.Key);
+                    mPidInfo process;
+                    lock (lockSystemctlInfo)
+                    {
+                      process = SystemctlInfo.Find(x => x.pid == p.Key);
+                    }
+                        
                     if(process==null)
                     {
                         Log.Error("Can't found browser with pid=" + p.Key.ToString()+".");

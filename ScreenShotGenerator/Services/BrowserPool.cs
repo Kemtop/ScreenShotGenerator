@@ -259,6 +259,7 @@ namespace ScreenShotGenerator.Services
             //Ищем браузер который нужно остановить.
             BrowserControlLogic Bl = poolBrowserControls.First(x=>x.browserId==browserId);
             Bl.shutdown();//Остановка браузера.
+            swapMonitor.removePid(browserId); //Удаляю информацию о процессах данного браузера.
             Thread.Sleep(10000);
             lock(lockerPool)
             {
