@@ -88,6 +88,12 @@ namespace ScreenShotGenerator.Services
         List<mImageList> DiskItems();
 
         /// <summary>
+        /// Ищет файл на диске кодированный указанным url.
+        /// </summary>
+        /// <returns></returns>
+        List<mImageList> FindFile(string url);
+
+        /// <summary>
         /// Запуск процесса очистки.
         /// </summary>
         void RunCleaning(List<mImageList> diskItems);

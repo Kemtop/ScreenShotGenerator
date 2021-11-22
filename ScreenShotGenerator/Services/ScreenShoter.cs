@@ -15,6 +15,8 @@ using ScreenShotGenerator.Entities;
 using Microsoft.Extensions.Configuration;
 using ScreenShotGenerator.Services.Models;
 using System.Diagnostics;
+using System.Text;
+using System.Security.Cryptography;
 
 namespace ScreenShotGenerator.Services
 {
@@ -327,6 +329,40 @@ namespace ScreenShotGenerator.Services
 
             return fileNames;
         }
+
+
+        /// <summary>
+        /// Ищет файл на диске кодированный указанным url.
+        /// </summary>
+        /// <returns></returns>
+        public List<mImageList> FindFile(string url)
+        {
+            //Кодированное имя файла.
+            string filenameMd5;
+            using (var md5 = MD5.Create())
+            {
+                var result = md5.ComputeHash(Encoding.ASCII.GetBytes(url));
+                filenameMd5= string.Join("", result.Select(x => x.ToString("X2"))).ToLower();
+            }
+
+            //Получение списка имен файлов.
+            string dirPath = @"wwwroot/imgCache";
+
+            IEnumerable<string> listNames = Directory
+            .GetFiles(dirPath, "*", SearchOption.TopDirectoryOnly)
+            .Select(f => Path.GetFileName(f));
+
+            string file = listNames.FirstOrDefault(x=>x.Contains(filenameMd5));
+
+            List<mImageList> fileNames = new List<mImageList>();
+            if (file != null)
+            {
+                fileNames.Add(new mImageList() { name = "/imgCache/" + file }); ;
+            }
+
+            return fileNames;
+        }
+
 
 
         /// <summary>

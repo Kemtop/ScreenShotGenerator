@@ -1,22 +1,32 @@
-@using ScreenShotGenerator.Models;
-@model IEnumerable<mImageList>
+﻿@using ScreenShotGenerator.Models;
+@model CashImagesModel
+<h3>Файлы во временной папке</h3>
 
-@{
-    Layout = null;
-}
-<!DOCTYPE html>
-<html>
-
-<head>
-    <title>Cash Screenshots</title>
-</head>
-
-<body>
-    @{ foreach (var img in Model)
-        {
-            <img src='@img.name' width="30%" height="30%">            
+<p>
+    <form asp-controller="Admin" asp-action="CashImages">
+        @Html.ValidationSummary(true)
+        <div class="input-group">
+            <input type="search" class="form-control rounded" placeholder="URL" aria-label="Search"
+                   aria-describedby="search-addon" asp-for="searchUrl" />
+            <button type="submit" class="btn btn-outline-primary">Поиск</button>
+        </div>
+        <span asp-validation-for="searchUrl" class="text-danger"></span>
+    </form>
+</p>
+<div>
+    <table border="1">
+        @{ foreach (var img in Model.Files)
+            {
+                <tr>
+                    <td>
+                        <a href="@img.name">
+                            <img src='@img.name' width="30%" height="30%">
+                        </a>
+                    </td>
+                </tr>
+            }
         }
-    }
+    </table>
 
-</body>
-</html>
+
+</div>

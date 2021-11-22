@@ -62,15 +62,22 @@ namespace ScreenShotGenerator.Controllers
         /// </summary>
         /// <returns></returns>
         [Authorize(Roles = RolesConst.Admin)]
-        public IActionResult CashImages()
+        public IActionResult CashImages(CashImagesModel model)
         {
-            //Получение списка имен файлов.
-            List<mImageList> fileNames = _screenShoter.DiskItems();
+            //Пустое поле поиска.
+            if (String.IsNullOrEmpty(model.searchUrl))
+            {
+                //Получение списка имен файлов.
+                List<mImageList> fileNames = _screenShoter.DiskItems();
+                model.Files = fileNames; 
+               
+                return View(model);
+            }
 
-            return View(fileNames);
+            model.Files = _screenShoter.FindFile(model.searchUrl); 
+            return View(model);
         }
-
-
+                
 
         /// <summary>
         /// Возвращает данные о состоянии памяти.
