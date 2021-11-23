@@ -409,7 +409,7 @@ namespace ScreenShotGenerator.Services
                         
                     if(process==null)
                     {
-                        Log.Error("Can't found browser with pid=" + p.pid.ToString()+".");
+                        Log.Error("SwapMonitor:Can't found browser with pid=" + p.pid.ToString()+".");
                         continue;
                     }
 

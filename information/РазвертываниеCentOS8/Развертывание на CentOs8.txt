@@ -234,7 +234,13 @@ ublock
 https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/
 Скрываем содержимое начальных вкладок.
 pupup blocked unlimite
+
+В настройках поставить:
+ "Удалять куки и данные сайтов при закрытии Firefox."
+"Не запоминать историю"
+В addblock ставим галочки заблокировтаь куки, и push.
 Ctrl+W закрыть вкладки браузера.
+Ctrl+Shift+P.
 
 Для остановки
 vncserver -kill :2

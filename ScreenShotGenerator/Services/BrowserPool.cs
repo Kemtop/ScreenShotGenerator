@@ -65,11 +65,7 @@ namespace ScreenShotGenerator.Services
         /// Директория для хранения временных файлов.
         /// </summary>
         private String tmpDir;
-
-        /// <summary>
-        /// Уникальный идентификатор браузера.
-        /// </summary>
-        private int browserId;
+                
 
         /// <summary>
         ///Содержимое страницы на которую браузер переходит перед созданием скрина. 
@@ -94,7 +90,6 @@ namespace ScreenShotGenerator.Services
         public BrowserPool(String tmpDir, ref PoolTasks poolTask,BrowserEndJobOnPage OnBrowserTaskCompleted)
         {
             poolBrowserControls = new List<BrowserControlLogic>();
-            //this.saveBrowserErrorDg = saveBrowserErrorDg;
             this.tmpDir = tmpDir;
             this.poolTask = poolTask;
             this.OnBrowserTaskCompleted = OnBrowserTaskCompleted;
@@ -126,7 +121,7 @@ namespace ScreenShotGenerator.Services
             //Создаю пул браузеров.
             for (int i = 0; i < poolBrowserSize; i++)
             {
-                int id = getBrowserId(); //Уникальный идентификатор браузера.
+                int id = BrowserIdGenerator.getId(); //Уникальный идентификатор браузера.
 
                 Log.Information("Create browser " + id.ToString()); //Вывод информации.
 
@@ -201,25 +196,9 @@ namespace ScreenShotGenerator.Services
 
 
         /// <summary>
-        /// Возвращает очередной идентификатор браузера.
-        /// </summary>
-        /// <returns></returns>
-        private int getBrowserId()
-        {
-            if (browserId < Int32.MaxValue - 10)
-                browserId++;
-            else
-                browserId = 1;
-
-            return browserId;
-        }
-
-
-
-        /// <summary>
         /// Запускает браузер и создает логику управления.
         /// </summary>
-        private void createItem(string blankPage,int browserId)
+        private void createItem(string blankPage,int id)
         {
             //Отладка.
             bool FireFox = true;
@@ -240,14 +219,14 @@ namespace ScreenShotGenerator.Services
             else
             {
                 //Задаю таймауты загрузки.
-                Br = new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts, true, browserId);
+                Br = new ImpBrowserControlChrome(pageLoadTimeouts, javaScriptTimeouts, true, id);
                 //Создаем экземпляр обьекта для управления браузером.
             }
 
             Br.blankPage = blankPage; //Страница перед созданием скриншота.
             Bl = new BrowserControlLogic(Br, saveBrowserErrorDg, tmpDir);
             Bl.tasksPerThread = 1; //Количество задач из пула которые браузер обрабатывает за раз.
-            Bl.browserId = browserId; //Ид браузера, что бы потоки как то можно отличать.
+            Bl.browserId = id; //Ид браузера, что бы потоки как то можно отличать.
 
             if (!Bl.startBrowser())//Запустить браузер. Выходим если не смог.
                 return;
@@ -263,7 +242,7 @@ namespace ScreenShotGenerator.Services
             Bl.browserRestartAfterScreens = browserRestartAfterScreens;
 
             //Считывает и сохраняет PID процессов драйвера.
-            swapMonitor.getDriverPids(browserId);
+            swapMonitor.getDriverPids(id);
             Bl.processPool(ref poolTask); //Запустить обработку пула задач.
             lock(lockerPool)
             {
@@ -279,22 +258,25 @@ namespace ScreenShotGenerator.Services
         /// Обработчик события по окончанию времени жизни браузера.
         /// </summary>
         /// <param name="browserId"></param>
-        private void OnEndLifeBrowser(int browserId)
+        private void OnEndLifeBrowser(int id)
         {
             //Существует ли браузер который нужно перезапустить.
             //Ищем браузер который нужно остановить.
-            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == browserId);
+            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == id);
             if ((Bl!=null)&&(Bl.beginShutdown)) //Браузер не закрыт и уже была отправлена команда закрытия.
             {
-                Log.Information("Browser " + browserId.ToString()+" in closing process.");
+                Log.Information("Browser " + id.ToString()+" in closing process.");
                 return;
             }
-
-            Log.Information("Browser "+browserId+" broken. Run new.");
+            
+            Log.Information("Browser "+id+" broken. Run new.");
             //Запускает новый браузер и создает логику управления.
-            createItem(blankPage, getBrowserId());
+            createItem(blankPage, BrowserIdGenerator.getId());
 
-            Log.Information("Call shutdown for broken browser(" + browserId + ").");
+            Log.Information("Call shutdown for broken browser(" + id + ").");
+            if (Bl == null)
+                Log.Error("Not found browser(" + id.ToString() + " in pool.");
+            else
             Bl.shutdown();//Остановка браузера.                    
         }
 
@@ -314,14 +296,14 @@ namespace ScreenShotGenerator.Services
             }
 
             Log.Information("Browser(" + id.ToString() + ") processes stoping. Remove from browser pool.");
-            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == browserId);
+            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == id);
             if (Bl != null) //Браузер cуществует.
             {
                 lock (lockerPool)
                 {
                     poolBrowserControls.Remove(Bl);
                 }
-                swapMonitor.removePid(browserId); //Удаляю информацию о процессах данного браузера.   
+                swapMonitor.removePid(id); //Удаляю информацию о процессах данного браузера.   
             }
             else
                 Log.Information("Browser(" + id.ToString() + ") not found in browser pool.");
@@ -339,7 +321,7 @@ namespace ScreenShotGenerator.Services
             //Создаю новые браузеры.
             for (int i = 0; i < count; i++)
             {
-                int id = getBrowserId(); //Уникальный идентификатор браузера.
+                int id = BrowserIdGenerator.getId(); //Уникальный идентификатор браузера.
 
                 Log.Information("Create browser " + id.ToString()); //Вывод информации.
 
@@ -371,13 +353,13 @@ namespace ScreenShotGenerator.Services
                                                    //Закрываем первые, а не последние. Что бы автоматически подчищать.
                 IEnumerable<BrowserControlLogic> BLtoClose = 
                     poolBrowserControls.OrderBy(x=>x.browserId).Take(needClose);
+
                 //Отправляем всем сигнал завершения работы.
                 foreach (BrowserControlLogic B in BLtoClose)
                 {
                     B.shutdown();
-                    poolBrowserControls.Remove(B); //Очистить пул.
-                }
-                   
+                    poolBrowserControls.Remove(B); //Очистить пул.                   
+                }                   
             }
 
         }
@@ -386,12 +368,12 @@ namespace ScreenShotGenerator.Services
         /// Обработчик события выхода из строя браузера.
         /// </summary>
         /// <param name="browserId"></param>
-        private void OnBrowserDie(int browserId)
+        private void OnBrowserDie(int id)
         {
             lock (lockerPool)
             {
                 //Ищем не рабочий браузер.
-                BrowserControlLogic Bl = poolBrowserControls.First(x => x.browserId == browserId);
+                BrowserControlLogic Bl = poolBrowserControls.First(x => x.browserId == id);
                 Bl.eventBrowserDie -= OnBrowserDie;
                 poolBrowserControls.Remove(Bl); //Очистить пул.
             }
