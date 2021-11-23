@@ -229,8 +229,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             {
                 SaveBrowserError("Warning:" +
                     "Time out on blank page after(last url="+ lastUrl 
-                    + ",curent url:"+url+") :", lastUrl,lastError, filename); //Сохраняю в лог.
-                Thread.Sleep(500); //Может это поможет.
+                    + ",curent url:"+url+") :", lastError,url, filename); //Сохраняю в лог.
             }
 
             //Измеряю затраченное время на открытие страницы.
@@ -239,7 +238,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
             if (!Navigate(url, ref hasException, filename)) return -1; //Браузер не работает.                                                                       
-            StopLoadScripts();//Останавливает выполнение js скриптов на странице.
+            StopLoadScripts(url);//Останавливает выполнение js скриптов на странице.
 
 
             //Замеряю истекшее время.
@@ -332,7 +331,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <summary>
         /// Останавливает выполнение js скриптов на странице.
         /// </summary>
-        private void StopLoadScripts()
+        private void StopLoadScripts(string url)
         {
             try
             {
@@ -340,7 +339,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
             catch(Exception ex)
             {
-                Log.Information("Exception in StopLoadScripts"+ex.Message);
+                Log.Information("Exception in StopLoadScripts(url="+url+"): "+ex.Message);
             }
         }
 
@@ -397,7 +396,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
             try
             {
-                Browser.SwitchTo().Alert().Dismiss();//  Accept(); //Закрываю алерт окно, и повторно пытаюсь сделать скрин.
+                Browser.SwitchTo().Alert().Dismiss();//  Accept(); //Закрываю алерт окно, и повторно пытаюсь сделать скрин.                                               
+                StopLoadScripts(url);//Останавливает выполнение js скриптов на странице.
             }
            catch(Exception ex)
             {

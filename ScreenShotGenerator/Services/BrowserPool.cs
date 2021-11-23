@@ -290,10 +290,11 @@ namespace ScreenShotGenerator.Services
                 return;
             }
 
-            Log.Information("Restart browser "+browserId);
+            Log.Information("Browser "+browserId+" broken. Run new.");
             //Запускает новый браузер и создает логику управления.
             createItem(blankPage, getBrowserId());
-                   
+
+            Log.Information("Call shutdown for broken browser " + browserId + ".");
             Bl.shutdown();//Остановка браузера.                    
         }
 
@@ -312,7 +313,7 @@ namespace ScreenShotGenerator.Services
                 Thread.Sleep(10000);
             }
 
-            Log.Information("Browser(" + id.ToString() + ") processes stoping. Clear browser pool.");
+            Log.Information("Browser(" + id.ToString() + ") processes stoping. Remove from browser pool.");
             BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == browserId);
             if (Bl != null) //Браузер cуществует.
             {
