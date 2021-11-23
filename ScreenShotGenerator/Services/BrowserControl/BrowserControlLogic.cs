@@ -120,11 +120,16 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public event browserDie eventBrowserDie;
   
-
         /// <summary>
         /// Запущен процесс завершения работы браузера.
         /// </summary>
-        private bool beginShutdown;
+        public bool beginShutdown;
+
+        /// <summary>
+        /// Событие возникающее когда браузер закрыт.
+        /// </summary>
+        public event browserCloseDg eventClosed;
+
 
         public BrowserControlLogic(IBrowserControl Browser_, saveBrowserError saveBrowserErrorDg_, string tmpDir)
         {
@@ -133,10 +138,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
             Browser = Browser_;
             Browser.saveBrowserErrorDg = saveBrowserErrorDg;
             cyrillicChars = getCyrillicChars();//Список кириллических символов, для ускорения проверки url.
-
+            Browser.eventClosed += OnBrowserClose;
         }
-
-
 
         /// <summary>
         /// Обработка задач в потоке задач. Запускает отдельную задачу для проверки и обработки пула.
@@ -190,6 +193,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
         {
             beginShutdown = true;
             waiter.Set(); //Будем логику обработки новой задачи.            
+        }
+
+        /// <summary>
+        /// Обработчик события "браузер закрыт".
+        /// </summary>
+        private void OnBrowserClose(int id)
+        {
+            eventClosed(browserId);
         }
 
 

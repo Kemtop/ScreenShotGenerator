@@ -31,7 +31,7 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Интервал мониторинга.
         /// </summary>
-        private static int monitoringInterval  = 60000;//1m
+        private static int monitoringInterval  = 30000;//1m
 
         /// <summary>
         /// Таймер запускающий задачу проверки необходимости очистки кеша.
@@ -414,7 +414,7 @@ namespace ScreenShotGenerator.Services
                     }
 
                     Log.Information("Swap limit for browserId=" + process.browserId.ToString()+
-                        ",process="+p.name+",swap usage(Kb)="+p.swap+".");
+                        ",process("+p.pid.ToString()+")="+p.name+",swap usage(Kb)="+p.swap+".");
                     //Генерирую событие.
                     eventSwapLimit(process.browserId);                    
                 }
@@ -422,5 +422,34 @@ namespace ScreenShotGenerator.Services
             }
         }
 
+        /// <summary>
+        /// Работают ли какие либо процессы браузера?
+        /// </summary>
+        /// <param name="browseId"></param>
+        public bool hasAnyProcess(int browseId)
+        {
+            //Узнаю все pid для данного браузера.
+            List<mPidInfo> bprocesses;
+            lock (lockSystemctlInfo)
+            {
+               bprocesses = SystemctlInfo.Where(x => x.browserId == browseId).ToList();
+            }
+
+            if (bprocesses.Count()==0)
+            {
+                Log.Error("Can't find any pid for browser "+browseId.ToString()+ " in SystemctlInfo.");
+                return false;
+            }
+
+            List<mPidInfo> info = getSystemctlInfo(); //Получаю все текущие процессы.
+
+            //Количество процессов браузера которых нет в info. Т.е. остановленных.       
+            int pCount=bprocesses.Except(info).Count();
+
+            //Все процессы браузера остановлены.
+            if (bprocesses.Count() == pCount) return true;
+
+            return false;
+        }
     }
 }

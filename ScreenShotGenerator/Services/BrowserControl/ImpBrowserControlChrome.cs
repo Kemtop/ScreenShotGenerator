@@ -71,6 +71,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Возвращает ошибку.
         /// </summary>
         public string lastError { get; }
+
+        /// <summary>
+        /// Событие возникающее когда браузер закрыт.
+        /// </summary>
+        public event browserCloseDg eventClosed;
+
         public ImpBrowserControlChrome(int pageLoadTimeouts, int javaScriptTimeouts,bool enableLog,int browserId)
         {
             //Путь к рабочей директории приложения.

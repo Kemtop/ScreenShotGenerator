@@ -2,7 +2,11 @@
 
 namespace ScreenShotGenerator.Services.BrowserControl
 {
- 
+    /// <summary>
+    ///Делегат для события-окончен процесс закрытия браузера. 
+    /// </summary>
+    public delegate void browserCloseDg(int id);
+
     /// <summary>
     /// Интерфейс для управления браузерами через Selenium.
     /// </summary>
@@ -40,5 +44,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         string lastError { get;}
 
+        /// <summary>
+        /// Событие возникающее когда браузер закрыт.
+        /// </summary>
+        event browserCloseDg eventClosed;
     }
 }

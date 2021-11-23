@@ -214,6 +214,7 @@ namespace ScreenShotGenerator.Services
             newJobForBrowser += Bl.OnNewJob; //Подписываем все браузеры на информирование о новой задаче.
             Bl.endLife += OnEndLifeBrowser; //Обрабатываем лимит срока работы браузера.
             Bl.eventBrowserDie += OnBrowserDie; //Событие по внезапному выходу из строя.
+            Bl.eventClosed +=OnBrowserClose;
 
             //Перезагрузить браузер после лимита по количеству скринов.
             Bl.browserRestartAfterScreens = browserRestartAfterScreens;
@@ -253,20 +254,48 @@ namespace ScreenShotGenerator.Services
         /// <param name="browserId"></param>
         private void OnEndLifeBrowser(int browserId)
         {
+            //Существует ли браузер который нужно перезапустить.
+            //Ищем браузер который нужно остановить.
+            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == browserId);
+            if ((Bl!=null)&&(Bl.beginShutdown)) //Браузер не закрыт и уже была отправлена команда закрытия.
+            {
+                Log.Information("Browser " + browserId.ToString()+" in closing process.");
+                return;
+            }
+
             Log.Information("Restart browser "+browserId);
             //Запускает новый браузер и создает логику управления.
             createItem(blankPage, getBrowserId());
+                   
+            Bl.shutdown();//Остановка браузера.                    
+        }
 
-            //Ищем браузер который нужно остановить.
-            BrowserControlLogic Bl = poolBrowserControls.First(x=>x.browserId==browserId);
-            Bl.shutdown();//Остановка браузера.
-            swapMonitor.removePid(browserId); //Удаляю информацию о процессах данного браузера.
-            Thread.Sleep(10000);
-            lock(lockerPool)
+        /// <summary>
+        /// Обработчик события закрытия браузера.
+        /// </summary>
+        /// <param name="id"></param>
+        private void OnBrowserClose(int id)
+        {
+            //Проверить не работают ли процессы браузера.
+            while(!swapMonitor.hasAnyProcess(id))
             {
-                poolBrowserControls.Remove(Bl);
+                Log.Information("Browser(" + id.ToString() + ") process steel work!");
+                Thread.Sleep(10000);
             }
-           
+
+            Log.Information("Browser(" + id.ToString() + ") processes stoping. Clear browser pool.");
+            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == browserId);
+            if (Bl != null) //Браузер cуществует.
+            {
+                lock (lockerPool)
+                {
+                    poolBrowserControls.Remove(Bl);
+                }
+                swapMonitor.removePid(browserId); //Удаляю информацию о процессах данного браузера.   
+            }
+            else
+                Log.Information("Browser(" + id.ToString() + ") not found in browser pool.");
+
         }
 
 

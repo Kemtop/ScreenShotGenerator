@@ -76,6 +76,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public string lastError { get; private set; }
 
+        /// <summary>
+        /// Событие возникающее когда браузер закрыт.
+        /// </summary>
+        public event browserCloseDg eventClosed;
+
 
         public ImpBrowserControlFireFox(int pageLoadTimeouts, int javaScriptTimeouts)
         {
@@ -449,6 +454,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         public void quit()
         {
             Browser.Quit();
+            Log.Information("Browser quit.");
+            eventClosed(0); //Генерирую событие что браузер закрыт. Ид не знаем=0.
         }
 
         /// <summary>
