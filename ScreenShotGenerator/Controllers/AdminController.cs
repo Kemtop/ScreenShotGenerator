@@ -166,7 +166,7 @@ namespace ScreenShotGenerator.Controllers
         public IActionResult rebootBrowser(string button)
         {
             //Перезапуск сервиса.
-            _screenShoter.restartService();
+            _screenShoter.restartAllBrowsers();
             return View();
         }
 

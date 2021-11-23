@@ -70,7 +70,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Последний url на который ходил браузер.
         /// </summary>
         private string lastUrl;
-                
+
+        /// <summary>
+        /// Объект для выполнения js скриптов.
+        /// </summary>
+        IJavaScriptExecutor JsExecuter;
+
         /// <summary>
         /// Возвращает ошибку.
         /// </summary>
@@ -187,7 +192,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Установка размера.
                 Browser.Manage().Window.Position = new System.Drawing.Point(0, 0); ;
                 Browser.Manage().Window.Size = new System.Drawing.Size(1280, 1060);
-                              
+                JsExecuter = (IJavaScriptExecutor)Browser;
+
             }
             catch (Exception ex)
             {
@@ -196,8 +202,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 Log.Error(msg);
                 return false;
             }
-
-            
+                        
             Log.Information("Run FireFox. Control Module Version 1.08.");
             return true;
         }
@@ -233,7 +238,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
             sw.Start();
 
             //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
-            if (!Navigate(url, ref hasException, filename)) return -1; //Браузер не работает.
+            if (!Navigate(url, ref hasException, filename)) return -1; //Браузер не работает.                                                                       
+            StopLoadScripts();//Останавливает выполнение js скриптов на странице.
 
 
             //Замеряю истекшее время.
@@ -298,10 +304,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
             {
                 SaveBrowserError("Null in screenshot"," ", url," ");
                 return -2; //Не смог сделать скрин шот по не известным причинам.
-            }    
-               
-            
+            }
 
+         
             try
             {  
                 //Конвертирую и сохраняю изображение в файл.
@@ -325,6 +330,22 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
         /// <summary>
+        /// Останавливает выполнение js скриптов на странице.
+        /// </summary>
+        private void StopLoadScripts()
+        {
+            try
+            {
+                JsExecuter.ExecuteScript("window.stop();"); //Останавливаю загрузку скриптов.
+            }
+            catch(Exception ex)
+            {
+                Log.Information("Exception in StopLoadScripts"+ex.Message);
+            }
+        }
+
+
+        /// <summary>
         /// Переходит по ссылке, в случае не критических проблем возвращает true.
         /// </summary>
         /// <param name="url"></param>
@@ -337,6 +358,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
             {
                 //Загружаем страницу, метод синхронный и пока страница не загрузиться дальше не идет.
                 Browser.Navigate().GoToUrl(url);
+            }
+            catch (OpenQA.Selenium.WebDriverTimeoutException te)
+            {
+                //Похоже истек таймаут.
+                lastError = te.Message;//Последняя ошибка.
+                hasException = true;
             }
             catch (Exception ex)
             {
@@ -355,7 +382,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 {
                     SaveBrowserError("Exception to GoToUrl:", ExceptionMessage, url, filename); //Сохраняю в лог.
                 }
-                             
+                              
             }
 
             return true;

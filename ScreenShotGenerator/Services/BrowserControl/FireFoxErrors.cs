@@ -48,12 +48,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// Не критические ошибки при загрузке страницы.
         /// </summary>
         private static string[] noCriticalPageErrors = {
-            "Timeout loading page", //Истек таймаут.
             "InsecureCertificate",
             "Reached error page: about:neterror",
             "TimedPromise"
         };
-        //TimedPromise timed out after 8000 m
+        //TimedPromise timed out after 8000 m удалить
+        //"Timeout loading page", //Истек таймаут. удалить
 
 
         /// <summary>

@@ -52,8 +52,7 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Перезапускает сервис.
         /// </summary>
-        void restartService();
-
+        void restartAllBrowsers();
 
         /// <summary>
         /// Возвращает количество ожидающих задач в пуле задач.

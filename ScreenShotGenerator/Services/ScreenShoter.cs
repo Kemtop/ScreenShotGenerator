@@ -227,63 +227,46 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         /// <param name="cancellationToken"></param>
         /// <returns></returns>
-        public async void runService(CancellationToken cancellationToken)
+        public void runService(CancellationToken cancellationToken)
         {
             _cancellationToken = cancellationToken;
-            await Task.Delay(2000);
-            runTasks(); //Создает пул браузеров.
-
+            browserPool.createPool(poolBrowserSize);//Создаем пул браузеров.
+            
             //Считывает данные кеш из базы данных в память(объект poolCash).
             if (enableReadCacheFromDbInStart)
                 readFromDbToCash();
         }
 
-        /// <summary>
-        /// Создает пул браузеров.
-        /// </summary>
-        private void runTasks()
-        {
-            Log.Information("Running browser control service...");
-            browserPool.createPool(poolBrowserSize);//Создаем пул браузеров.
-
-            Log.Information("Browser control service it running.");
-
-        }
-
+      
 
         /// <summary>
-        /// Перезапускает службу.
+        /// Перезапускает все браузеры.
         /// </summary>
-        public void restartService()
+        public void restartAllBrowsers()
         {
             browserReboot = true; //Блокирую алгоритм открытия новых браузеров, при новом запросе.
-            stopBrowserPool();
-            //Останавливает все задачи в пуле, закрывает браузеры.
+            Log.Information("Got the command restart browsers.");
+            browserPool.clearPool(); //Закрываю все браузеры.
+
             int delay = 10000;
             Log.Information("Waiting " + (delay / 1000).ToString() + "s"); ;
 
-             Thread.Sleep(delay);
-            runTasks();
+            Thread.Sleep(delay);
+            browserPool.createPool(poolBrowserSize);//Создаем пул браузеров.
             Log.Information("Service is restarted.");
 
             browserReboot = false; //Разблокирую алгоритм открытия новых браузеров, при новом запросе.
         }
 
-
         /// <summary>
-        /// Останавливает все задачи в пуле, закрывает браузеры.
+        /// Получили от системы команду остановки.
         /// </summary>
-        private void stopBrowserPool()
-        {
-            Log.Information("Stoping services...");
-            browserPool.clearPool();
-            Log.Information("StopService.");
-        }
-
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public Task stopService(CancellationToken cancellationToken)
         {
-            stopBrowserPool();
-
+            browserPool.Stop();//Закрываю браузеры и информирую об остановке сервиса всю вложенную логику.
+            Log.Information("-----------------Service stoped------------------------");
             return Task.CompletedTask;
         }
 

@@ -85,6 +85,11 @@ namespace ScreenShotGenerator.Services
         /// Перезагружать браузер после определенного количество скриншотов. 0-не перезагружать.
         /// </summary>
         public int  browserRestartAfterScreens;
+
+        /// <summary>
+        /// Информирует ждущие службы об остановке сервиса.
+        /// </summary>
+        private bool serviceStoping;
                 
         public BrowserPool(String tmpDir, ref PoolTasks poolTask,BrowserEndJobOnPage OnBrowserTaskCompleted)
         {
@@ -105,47 +110,15 @@ namespace ScreenShotGenerator.Services
             newJobForBrowser();
         }
 
-        /// <summary>
-        /// Считывает пустую страницу.
-        /// </summary>
-        /// <returns></returns>
-        private string loadBlankPage()
-        {
-            string filePathFull = Path.Combine(Directory.GetCurrentDirectory(), @"wwwroot/blankPage.html");
-            try
-            {
-                return File.ReadAllText(filePathFull);
-            }
-            catch(Exception ex)
-            {
-                Log.Error("Error read blank page:"+ex.Message);
-                return null;
-            }
-            
-        }
-
-
-        /// <summary>
-        /// Возвращает очередной идентификатор браузера.
-        /// </summary>
-        /// <returns></returns>
-        private int getBrowserId()
-        {
-            if (browserId < Int32.MaxValue - 10)
-                browserId++;
-            else
-                browserId = 1;
-
-            return browserId;
-        }
-
-
+        
         /// <summary>
         /// Создает пул браузеров указанного размера.
         /// </summary>
         /// <param name="size"></param>
         public void createPool(int poolBrowserSize)
         {
+            Log.Information("Running browser control service...");
+
             //Считываю страницу на которую браузер переходит перед созданием скрина. Говррю что это не url,а html строка.
             //blankPage= "data:text/html;charset=utf-8,"+loadBlankPage();
             blankPage = "about:blank";
@@ -170,8 +143,78 @@ namespace ScreenShotGenerator.Services
 
             swapMonitor.eventSwapLimit+=OnEndLifeBrowser; //Если превышен лимит swap.
             swapMonitor.runMonitoring();//Запускаю мониторинг использования браузерами свопа.
+            Log.Information("Browser control service it running.");
+        }
+
+        /// <summary>
+        /// Очищаю пул браузеров. Закрываю все существующие.
+        /// </summary>
+        public void clearPool()
+        {
+            Log.Information("Stoping browsers in pool...");
+
+            int i = 1;
+            foreach (BrowserControlLogic bl in poolBrowserControls)
+            {
+                Log.Information("Close browser..." + i.ToString());
+                bl.stopProcess();
+                i++;
+            }
+
+            //Очищаю пулл.
+            poolBrowserControls.Clear();
+            Log.Information("Browsers pool clear. All browser stoped.");
+        }
+
+
+        /// <summary>
+        /// Возвращает количество работающих браузеров на текущий момент.
+        /// </summary>
+        /// <returns></returns>
+        public int browserCount()
+        {
+            lock (lockerPool)
+            {
+                return poolBrowserControls.Count;
+            }
+        }
+
+
+        /// <summary>
+        /// Считывает пустую страницу.
+        /// </summary>
+        /// <returns></returns>
+        private string loadBlankPage()
+        {
+            string filePathFull = Path.Combine(Directory.GetCurrentDirectory(), @"wwwroot/blankPage.html");
+            try
+            {
+                return File.ReadAllText(filePathFull);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Error read blank page:" + ex.Message);
+                return null;
+            }
 
         }
+
+
+        /// <summary>
+        /// Возвращает очередной идентификатор браузера.
+        /// </summary>
+        /// <returns></returns>
+        private int getBrowserId()
+        {
+            if (browserId < Int32.MaxValue - 10)
+                browserId++;
+            else
+                browserId = 1;
+
+            return browserId;
+        }
+
+
 
         /// <summary>
         /// Запускает браузер и создает логику управления.
@@ -229,23 +272,7 @@ namespace ScreenShotGenerator.Services
            
         }
 
-
-        /// <summary>
-        /// Очищаю пул браузеров. Закрываю все существующие.
-        /// </summary>
-        public void clearPool()
-        {
-            int i = 1;
-            foreach (BrowserControlLogic bl in poolBrowserControls)
-            {
-                Log.Information("Close browser..." + i.ToString());
-                bl.stopProcess();
-                i++;
-            }
-
-            //Очищаю пулл.
-            poolBrowserControls.Clear();
-        }
+             
 
 
         /// <summary>
@@ -276,8 +303,10 @@ namespace ScreenShotGenerator.Services
         /// <param name="id"></param>
         private void OnBrowserClose(int id)
         {
+            if (serviceStoping) return; //Получена команда остановки сервиса. Ни как не реагируем на закрытие браузеров.
+
             //Проверить не работают ли процессы браузера.
-            while(!swapMonitor.hasAnyProcess(id))
+            while (!swapMonitor.hasAnyProcess(id))
             {
                 Log.Information("Browser(" + id.ToString() + ") process steel work!");
                 Thread.Sleep(10000);
@@ -299,18 +328,7 @@ namespace ScreenShotGenerator.Services
         }
 
 
-        /// <summary>
-        /// Возвращает количество работающих браузеров на текущий момент.
-        /// </summary>
-        /// <returns></returns>
-        public int browserCount()
-        {
-            lock (lockerPool)
-            {
-               return poolBrowserControls.Count;
-            }
-        }
-
+      
         /// <summary>
         /// Запускает новые браузеры в количестве.
         /// </summary>
@@ -378,5 +396,13 @@ namespace ScreenShotGenerator.Services
             }
         }
 
+        /// <summary>
+        ///Закрываю браузеры и информирую об остановке сервиса всю вложенную логику.
+        /// </summary>
+        public void Stop()
+        {
+            serviceStoping = true;
+            clearPool(); //Закрываю все браузеры.
+        }
     }
 }
