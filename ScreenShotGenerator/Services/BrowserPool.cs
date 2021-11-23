@@ -294,7 +294,7 @@ namespace ScreenShotGenerator.Services
             //Запускает новый браузер и создает логику управления.
             createItem(blankPage, getBrowserId());
 
-            Log.Information("Call shutdown for broken browser " + browserId + ".");
+            Log.Information("Call shutdown for broken browser(" + browserId + ").");
             Bl.shutdown();//Остановка браузера.                    
         }
 

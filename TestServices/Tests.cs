@@ -66,17 +66,49 @@ namespace TestServices
                 //Спрашиваю у пользователя.
                 hostKey = getFromUserНost(hosts);
             }
-   
+
+
+            int beginLine=beginFromLine();//Строка с которой нужно начинать тест.
             Log.Information("Run Test1.");
             Console.WriteLine("Read file.");
             // prepareRundomFile(); //Ручная генерация.
 
             //Читаю файл в список.
-            readFileFormatLinks(@"links.txt");
-            taskTest1(1,tasks,hosts[hostKey]);
+            readFileFormatLinks(@"links.txt", beginLine);
+            if(beginLine>0)
+            {
+                string info = "Test begin from " + beginLine + " lines. url=" + urls[0].url;
+                Log.Information(info);
+                Console.WriteLine(info);
+            }
+
+            taskTest1(1,tasks,hosts[hostKey],beginLine);
         }
 
+        /// <summary>
+        /// Читает файл beginFrom.txt, и запускает тест с указанной в нем строки.
+        /// Если файла нет, возвращает 0.
+        /// </summary>
+        /// <returns></returns>
+        private int beginFromLine()
+        {
+           string curentDirectory = Directory.GetCurrentDirectory();
+           string filePath=curentDirectory + @"/beginFrom.txt";
 
+            bool exists = System.IO.File.Exists(filePath);
+            if (!exists) return 0;
+
+            List<string> lines = System.IO.File.ReadLines(filePath).ToList();
+            int value = 0;
+            if(!Int32.TryParse(lines[0],out value))
+            {
+                string info = "Bad value in first line " + filePath + ". Test run from 0 line";
+                Log.Error(info);
+                Console.WriteLine(info);
+            }
+
+            return value;
+        }
 
         /// <summary>
         /// Спрашиваю у пользователя сколько задач отправлять за один запрос.
@@ -155,20 +187,18 @@ namespace TestServices
         /// Читает файл в котором на каждой строке находится только url сайта.
         /// </summary>
         /// <param name="path"></param>
-        public void readFileFormatLinks(string path)
+        public void readFileFormatLinks(string path,int beginFromLine)
         {
-            int id = 0;
-
-            foreach (string line in System.IO.File.ReadLines(path))
+            List<string> lines = System.IO.File.ReadLines(path).Skip(beginFromLine).ToList();
+            int id = 0;            
+            foreach (string line in lines)
             {
-
                 mTableWebicons m = new mTableWebicons();
                 m.url = line.Trim();
                 m.id = id;
                 id++;
 
                 urls.Add(m);
-
             }
         }
 
@@ -419,13 +449,13 @@ namespace TestServices
         /// <summary>
         /// Поток выполняющий тестирование сервиса по новому алгоритму.
         /// </summary>
-        private void taskTest1(int threadNum,int screeShotPerThread,string hostName)
+        private void taskTest1(int threadNum,int screeShotPerThread,string hostName,int startpos)
         {
             List<mTableWebicons> data;
             bool work = true;
             Stopwatch stopWatch = new Stopwatch(); //Измеряем время выполнения сервером запроса.
 
-            int pos = 0; //Количество обработанных.
+            int pos = startpos; //Количество обработанных.
 
             while (work)
             {
@@ -477,7 +507,7 @@ namespace TestServices
                 //Сохраняет результаты в БД.
                 saveResults(elapsedTime, jsonAnswer, request);
 
-                Log.Information("Thread" + threadNum.ToString() + "completed " +
+                Log.Information("Thread" + threadNum.ToString() + " completed " +
                     pos.ToString() + " line. " + screeShotPerThread.ToString() + " screens " + elapsedTime + " second."); ;
 
             }

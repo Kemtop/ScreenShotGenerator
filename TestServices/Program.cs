@@ -11,6 +11,7 @@ namespace TestServices
             Console.WriteLine("Input test number and press enter.");
             Console.WriteLine();
             Console.WriteLine("1:Begin one thread request test.");
+    
             // Console.WriteLine("2:Multi thread.");
 
             //Автоматически запускать тест.
