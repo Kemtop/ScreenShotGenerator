@@ -48,6 +48,8 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private object lockSystemctlInfo;
 
+        private object lockCommandSender;
+
         /// <summary>
         ///Cобытие по превышению лимита swap.
         /// </summary>
@@ -56,7 +58,8 @@ namespace ScreenShotGenerator.Services
         public SwapMonitor()
         {
             SystemctlInfo = new List<mPidInfo>();
-            lockSystemctlInfo = new Object();
+            lockSystemctlInfo = new object();
+            lockCommandSender = new object();
         }
 
 
@@ -87,16 +90,21 @@ namespace ScreenShotGenerator.Services
         /// <returns></returns>
         private List<mPidInfo> getSystemctlInfo()
         {
+            string ret = "";
             try
             {
-                string command = "systemctl status screenShotService";
-                string ret = runCommand(command);
+                string command = "systemctl status screenShotService";              
+                lock (lockCommandSender)
+                {
+                   ret = runCommand(command);
+                }
+                
                 List<mPidInfo> SystemctlLines = ParceSystemctlAnswer(ret);
                 return SystemctlLines;
             }
             catch (Exception ex)
             {
-                Log.Information("Exception in getSystemctlInfo(SwapMonitor):" + ex.Message);
+                Log.Information("Exception in getSystemctlInfo(SwapMonitor):" + ex.Message+";answer="+ret);
                 return null;
             }
         }
@@ -104,9 +112,10 @@ namespace ScreenShotGenerator.Services
         /// <summary>
         /// Считывает и сохраняет PID процессов драйвера.
         /// </summary>
-        public void getDriverPids(int browserId)
+        public bool getDriverPids(int browserId)
         {
             List<mPidInfo> info = getSystemctlInfo();
+            if (info == null) return false; 
 
             //Возвращает новые элементы из info которых нет в SystemctlInfo.
             IEnumerable<mPidInfo> whichAreNot = null;
@@ -136,6 +145,7 @@ namespace ScreenShotGenerator.Services
             if (hasNew)
                 Log.Information("----------------");
 
+            return true;
         }
 
         /// <summary>
@@ -253,7 +263,7 @@ namespace ScreenShotGenerator.Services
         /// Выполняет команду на linux системе.
         /// </summary>
         private string runCommand(string command)
-        {
+        {          
             string result = "";
             using (System.Diagnostics.Process proc = new System.Diagnostics.Process())
             {
@@ -282,7 +292,13 @@ namespace ScreenShotGenerator.Services
             List<mSwapInfo> swapData = new List<mSwapInfo>();
             try
             {
-                string ret = runCommand("./swapMonitoring");
+                string ret = "";
+                lock (lockCommandSender)
+                {
+                    ret=runCommand("./swapMonitoring");
+                }
+
+               
                 //Удаляю шапку.
                 ret = clearTitleSwapInfo(ret);
                 string[] Lines = ret.Split('\n');

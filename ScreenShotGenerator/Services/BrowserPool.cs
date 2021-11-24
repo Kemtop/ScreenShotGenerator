@@ -242,7 +242,20 @@ namespace ScreenShotGenerator.Services
             Bl.browserRestartAfterScreens = browserRestartAfterScreens;
 
             //Считывает и сохраняет PID процессов драйвера.
-            swapMonitor.getDriverPids(id);
+            int cnt = 0;
+            while (!serviceStoping && (cnt < 10))
+            {
+                if (swapMonitor.getDriverPids(id)) break; //Если успешно получили.
+                cnt++;
+                Thread.Sleep(1000);
+            }
+            
+            if(cnt>10)
+            {
+                Log.Error("Fatal error! Can't get pid info for browser.");
+                throw new Exception("Fatal error!");
+            }
+
             Bl.processPool(ref poolTask); //Запустить обработку пула задач.
             lock(lockerPool)
             {
