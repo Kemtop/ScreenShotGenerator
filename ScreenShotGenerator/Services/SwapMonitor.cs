@@ -2,6 +2,7 @@
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -48,8 +49,6 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private object lockSystemctlInfo;
 
-        private object lockCommandSender;
-
         /// <summary>
         ///Cобытие по превышению лимита swap.
         /// </summary>
@@ -59,7 +58,6 @@ namespace ScreenShotGenerator.Services
         {
             SystemctlInfo = new List<mPidInfo>();
             lockSystemctlInfo = new object();
-            lockCommandSender = new object();
         }
 
 
@@ -93,12 +91,9 @@ namespace ScreenShotGenerator.Services
             string ret = "";
             try
             {
-                string command = "systemctl status screenShotService";              
-                lock (lockCommandSender)
-                {
-                   ret = runCommand(command);
-                }
-                
+                string command = "systemctl status screenShotService"; 
+                ret = runCommand(command);
+ 
                 List<mPidInfo> SystemctlLines = ParceSystemctlAnswer(ret);
                 return SystemctlLines;
             }
@@ -108,6 +103,20 @@ namespace ScreenShotGenerator.Services
                 return null;
             }
         }
+
+        /// <summary>
+        /// Тестовый метод. Считывает из файла ответ системы systemctl status screenShotService 
+        /// и передает на вход getSystemctlInfo().
+        /// </summary>
+        public void TestGetSystemctlInfo()
+        {
+            //Файл с ответом systemctl status screenShotService в правильной кодировке(Unix(LF)).
+            string path = @"SwapTest.txt"; //Должен находиться в корне проекта.
+            string readText = File.ReadAllText(path);
+            List<mPidInfo> SystemctlLines = ParceSystemctlAnswer(readText);
+            int y = 0;
+        }
+
 
         /// <summary>
         /// Считывает и сохраняет PID процессов драйвера.
@@ -247,6 +256,8 @@ namespace ScreenShotGenerator.Services
         /// <returns></returns>
         private mPidInfo toPidInfo(string info)
         {
+            //В некоторых случаях(4цифры в номере процесса) строка дополняется пробелами в начале.
+            info = info.Trim();
             mPidInfo m = new mPidInfo();
             int pos = info.IndexOf(' ');
             string pid = info.Substring(0, pos);
@@ -292,13 +303,7 @@ namespace ScreenShotGenerator.Services
             List<mSwapInfo> swapData = new List<mSwapInfo>();
             try
             {
-                string ret = "";
-                lock (lockCommandSender)
-                {
-                    ret=runCommand("./swapMonitoring");
-                }
-
-               
+                string ret=runCommand("./swapMonitoring");               
                 //Удаляю шапку.
                 ret = clearTitleSwapInfo(ret);
                 string[] Lines = ret.Split('\n');

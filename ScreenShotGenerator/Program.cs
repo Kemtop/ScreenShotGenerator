@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ScreenShotGenerator.perfomenceService;
+using ScreenShotGenerator.Services;
 using Serilog;
 using Serilog.Events;
 
