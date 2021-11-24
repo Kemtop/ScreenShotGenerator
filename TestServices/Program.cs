@@ -11,10 +11,11 @@ namespace TestServices
             Console.WriteLine("Input test number and press enter.");
             Console.WriteLine();
             Console.WriteLine("1:Begin one thread request test.");
-    
+            Console.WriteLine("2:Convert phpMyAdmin file.");
+
             // Console.WriteLine("2:Multi thread.");
 
-            //Автоматически запускать тест.
+            //Автоматически запускать тест,если приложение запускается как сервис на Linux.
             if (args.Length != 0)
             {
                 Tests test1 = new Tests();
@@ -47,6 +48,7 @@ namespace TestServices
             switch(res)
             {
                 case 1: test.runTest1(args); break;
+                case 2: test.ConvertFile(); break;
 
                 default: break;
             }

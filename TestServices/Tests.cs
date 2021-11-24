@@ -75,7 +75,8 @@ namespace TestServices
 
             //Читаю файл в список.
             readFileFormatLinks(@"links.txt", beginLine);
-            if(beginLine>0)
+
+            if (beginLine>0)
             {
                 string info = "Test begin from " + beginLine + " lines. url=" + urls[0].url;
                 Log.Information(info);
@@ -211,7 +212,7 @@ namespace TestServices
         void prepareRundomFile()
         {
             List<mTableWebicons> tmp = new List<mTableWebicons>();
-            readFile1(ref tmp);
+            readFilePhpMyAdmin(ref tmp, @"websites_online.sql", "INSERT INTO `websites_online` (`element_url`) VALUES",0);
 
             //Так как записи отсортированы, рандомизируем их.
             Random rnd = new Random();
@@ -259,42 +260,83 @@ namespace TestServices
                                     
         }
 
-       
+
+        /// <summary>
+        /// Преобразовывает файл из вида вышрузки phpMyAdmin в текстовый файл.
+        /// </summary>
+        public void ConvertFile()
+        {
+            Console.WriteLine("You most remove all rubbish from file.");
+            string fileName = @"websites_online.sql";
+            string beginblock = "INSERT INTO `websites_online` (`id`, `element_url`) VALUES";
+            Console.WriteLine("Read file " + fileName);
+            List<mTableWebicons> lines = new List<mTableWebicons>();
+            readFilePhpMyAdmin(ref lines,fileName,beginblock,1);
+            Console.WriteLine("Read "+lines.Count().ToString()+".");
+
+            string outFileName = "links.txt";
+            Console.WriteLine("Write to file "+outFileName);
+
+            using (StreamWriter w = File.AppendText("links.txt"))
+            {
+                foreach (mTableWebicons line in lines)
+                {
+                    w.WriteLine(line.url);
+                }
+            }
+
+            Console.WriteLine("End");
+        }
+
+
+
         /// <summary>
         /// Читает файл с http запросами. Вида
-        /// INSERT INTO `websites_online` (`element_url`) VALUES
+        /// INSERT INTO `websites_online` (`element_url`) VALUES указанными в beginblock.
         // (' https://yandex.ru/?clid=2299450'),
         ///('http:// Angryfox.info'),
         /// </summary>
         /// <param name="urls"></param>
-        public void readFile1(ref List<mTableWebicons> urls)
+        private void readFilePhpMyAdmin(ref List<mTableWebicons> urls,string fileName,string beginblock,int urlPos)
         {
             int id = 0;
+            List<string> lines=System.IO.File.ReadLines(fileName).ToList();
 
             // Read the file and display it line by line.  
             bool enableBlock = false;
-            foreach (string line in System.IO.File.ReadLines(@"websites_online.sql"))
+            string line = "";
+
+            foreach (string line_ in lines)
             {
+                line = line_;
+                if (String.IsNullOrEmpty(line)) continue;
+                if (line.Length<3) continue;
 
                 //Начало вставки в таблицу.
-                if (line == "INSERT INTO `websites_online` (`element_url`) VALUES")
+                if (line.Contains(beginblock))
                 {
                     enableBlock = true;
                     continue;
                 }
 
-
-                if (enableBlock && (line.Contains(';')))
+                //Конец блока данных
+                if (enableBlock)
                 {
-                    enableBlock = false;
+                    string str = line.Substring(line.Length - 3);
+                    if(str.Contains("');"))
+                    {
+                        line = line.Substring(0,line.Length-1);
+                    }
+                    //enableBlock = false;
                 }
 
                 //Разрешено чтение блока.
                 if (enableBlock)
                 {
                     String[] arr = line.Split(',');
+                    if (arr.Length < urlPos+1) continue; //Обход мусора в файле.
                     mTableWebicons m = new mTableWebicons();                   
-                    m.url = arr[0].Replace("'", "");
+                    m.url = arr[urlPos].Replace("'", "");
                     m.url = m.url.Replace("(", "");
                     m.url = m.url.Replace(")", "");
 
@@ -317,7 +359,6 @@ namespace TestServices
         /// <param name="urls"></param>
         public void readFile(ref List<mTableWebicons> urls)
         {
-
 
             // Read the file and display it line by line.  
             bool enableBlock = false;

@@ -250,7 +250,7 @@ namespace ScreenShotGenerator.Services
                 Thread.Sleep(1000);
             }
             
-            if(cnt>10)
+            if(cnt>=10)
             {
                 Log.Error("Fatal error! Can't get pid info for browser.");
                 throw new Exception("Fatal error!");
