@@ -399,6 +399,17 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
 
+            //Запрещенный доступ к браузеру.
+            if(p.url.Contains("about:"))
+            {
+                string errMsg = "Error:Access to the settings page!Rejected. url=" + p.url;
+                p.status = (int)enumTaskStatus.End;
+                p.fileName = UrlErrorImg.badUrl;
+                //Cохраняю логи в БД.
+                saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
+                Log.Error(errMsg);
+                return false;
+            }
 
             try
             {
