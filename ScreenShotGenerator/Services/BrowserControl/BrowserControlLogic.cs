@@ -63,7 +63,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private Task workTask;
 
-
         /// <summary>
         /// Делегат для сохранения сведений об ошибках браузера.
         /// </summary>
@@ -172,10 +171,36 @@ namespace ScreenShotGenerator.Services.BrowserControl
             threadIsRun = false; //Остановка процесса обработки задач, если запущен.
             waiter.Set(); //Что бы вечно не ждала система завершения задачи.
             finishedJob("");//Что бы вечно не ждала система завершения задачи.
-            Browser.quit();
+            stopBrowser();
             //Ждем завершения задачи.
             Task.WaitAny(workTask);
         }
+
+        /// <summary>
+        /// Остановка браузера, если не остановлен.
+        /// </summary>
+        private void stopBrowser()
+        {
+            //Может случиться что браузер останавливаться или остановлен,
+            //в случае критической остановки(резкое увеличение swap). Поэтому игнорируем исключения.
+            try
+            {
+                Browser.quit();
+            }
+            catch
+            {  }
+        }
+
+        /// <summary>
+        /// Критическая остановка в случае резкого переполнения swap.
+        /// </summary>
+        public void CriticalStop()
+        {
+            beginShutdown = true;
+            stopBrowser();       
+            waiter.Set(); //Будем логику обработки новой задачи.  
+        }
+
 
         /// <summary>
         /// Обработчик события появления новой работы в ScreenShoter.
@@ -211,22 +236,19 @@ namespace ScreenShotGenerator.Services.BrowserControl
         {
             while (threadIsRun)
             {
-                //Список задач из пула.
-
-
                 waiter.WaitOne();//Жду появления новой задачи.
 
                 //Остановка работы браузера.
                 if (beginShutdown)
                 {
-                    Browser.quit();
+                    stopBrowser();
                     return;
                 }
 
                 //Выбирает из пула задач первые новые, в количестве tasksPerThread.
                 //Проставляет им статус "Заблокировано браузером".
                 List<mJobPool> data = poolTasks.getAndLockNewTasks(tasksPerThread, browserId);
-
+                
                 //Нет данных для обработки.
                 if (data.Count == 0)
                 {
@@ -260,20 +282,24 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     //Cоздание скриншота.
                     int answ=Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime, p.imageSize,
                         ref p.fileSize);
-                   
-                    //Browser die.
-                    if(answ==-1)
+
+                    //Если критическая остановка.
+                    if (beginShutdown)
                     {
                         //Устанавливаем выполняемым задачам статус "Новая".
-                        foreach (mJobPool t in data)
-                        {
-                            if(t.status==(int)enumTaskStatus.LockByBrowser)
-                            t.status = (int)enumTaskStatus.NewTask;
-                        }
-                                                
+                        ResetStatus(ref data);
+                        return;
+                    }
+
+                    //Browser die.
+                    if (answ==-1)
+                    {
+                        //Устанавливаем выполняемым задачам статус "Новая".
+                        ResetStatus(ref data);
+                        
                         saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, "Browser DIE!", p.url, p.fileName);
                         eventBrowserDie(browserId);
-                        Browser.quit(); //Останавливаю то что осталось от браузера(драйвер).                       
+                        stopBrowser(); //Останавливаю то что осталось от браузера(драйвер).                       
                         return;
                     }
 
@@ -322,12 +348,26 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, lastError, p.url, p.fileName);
                     }
 
+                    //beginShutdown
+
                     //Формирую событие по окончанию выполнения задачи.
                     finishedJob(p.requestId); //Передаю идентификатор http запроса.
                     countComplatedTasks(); //Увеличивает счетчик скриншоттов.
                 }
 
 
+            }
+        }
+
+        /// <summary>
+        /// Меняет статус не выполненным задачам на "Новая".
+        /// </summary>
+        private void ResetStatus(ref List<mJobPool> data)
+        {
+            foreach (mJobPool t in data)
+            {
+                if (t.status == (int)enumTaskStatus.LockByBrowser)
+                    t.status = (int)enumTaskStatus.NewTask;
             }
         }
 

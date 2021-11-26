@@ -136,7 +136,7 @@ namespace ScreenShotGenerator.Services
                 }
             }
 
-            swapMonitor.eventSwapLimit += OnEndLifeBrowser; //Если превышен лимит swap.
+            swapMonitor.eventSwapLimit += OnSwapLimit; //Если превышен лимит swap.
             swapMonitor.runMonitoring();//Запускаю мониторинг использования браузерами свопа.
             Log.Information("Browser control service it running.");
         }
@@ -286,6 +286,45 @@ namespace ScreenShotGenerator.Services
                 Bl.shutdown();//Остановка браузера.                    
         }
 
+
+        /// <summary>
+        /// Обработчик события по окончанию времени жизни браузера.
+        /// </summary>
+        /// <param name="browserId"></param>
+        private void OnSwapLimit(int id,int size)
+        {
+            //Нет критического переполнения свопа.
+            if(size<100000)
+            {
+                OnEndLifeBrowser(id); //Обычная остановка браузера.
+                return;
+            }
+
+            //Существует ли браузер для которого критическое переполние.
+            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == id);
+            if (Bl == null)
+            {
+                Log.Error("Not found browser(" + id.ToString() + ") for critical stop!");
+                return;
+            }
+
+            if (Bl.beginShutdown) //Браузер не закрыт и уже была отправлена команда закрытия.
+            {
+                Log.Information("Browser " + id.ToString() + " in closing process.");
+                return;
+            }
+
+            Bl.CriticalStop(); //Критическая остановка.
+            //Критическая остановка браузера. Что бы система не упала от резкого роста swap(за 30сек 2Гб).
+            Log.Information("Critical stop for browser("+id.ToString()+").");            
+            
+            Thread.Sleep(3000); //Ожидаение очистки swap, что бы система не упала.
+            Log.Information("Browser " + id + " broken. Run new.");
+            //Запускает новый браузер и создает логику управления.
+            createItem(blankPage, BrowserIdGenerator.getId());
+        }
+
+
         /// <summary>
         /// Обработчик события закрытия браузера.
         /// </summary>
@@ -315,8 +354,6 @@ namespace ScreenShotGenerator.Services
                 Log.Information("Browser(" + id.ToString() + ") not found in browser pool.");
 
         }
-
-
 
         /// <summary>
         /// Запускает новые браузеры в количестве.

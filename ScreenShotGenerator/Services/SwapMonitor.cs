@@ -13,7 +13,7 @@ namespace ScreenShotGenerator.Services
     /// Делегат для события по превышению лимита swap.
     /// </summary>
     /// <returns></returns>
-    public delegate void swapLimit(int browserId);
+    public delegate void swapLimit(int browserId,int swapUsage);
 
 
     /// <summary>
@@ -50,6 +50,11 @@ namespace ScreenShotGenerator.Services
         private object lockSystemctlInfo;
 
         /// <summary>
+        /// Файл с временем запуска мониторинга.
+        /// </summary>
+        private string LogPath;
+
+        /// <summary>
         ///Cобытие по превышению лимита swap.
         /// </summary>
         /// <returns></returns>
@@ -58,6 +63,8 @@ namespace ScreenShotGenerator.Services
         {
             SystemctlInfo = new List<mPidInfo>();
             lockSystemctlInfo = new object();
+            LogPath= Directory.GetCurrentDirectory() + @"/swapmonitorLog.txt";
+            CreateLogFile();
         }
 
 
@@ -412,10 +419,12 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private void Monitor()
         {
+            WriteToLog("run monitor");
             //Получаю информацию о занимаемом пространстве swap процессами.
             List<mSwapInfo> swapData = GetSwapInfo();
             if (swapData == null) return;
-            
+
+            WriteToLog("has data");
             //Проверка лимитов.
             foreach (mSwapInfo p in swapData)
             {
@@ -436,8 +445,9 @@ namespace ScreenShotGenerator.Services
 
                     Log.Information("Swap limit for browserId=" + process.browserId.ToString()+
                         ",process("+p.pid.ToString()+")="+p.name+",swap usage(Kb)="+p.swap+".");
-                    //Генерирую событие.
-                    eventSwapLimit(process.browserId);                    
+                    //Генерирую событие. Передаю размер используемого свопа
+                    //для критической остановки(если за 30сек своп выпрос до 2Гб.)
+                    eventSwapLimit(process.browserId,(int)p.swap);                    
                 }
                    
             }
@@ -472,5 +482,34 @@ namespace ScreenShotGenerator.Services
 
             return false;
         }
+
+        /// <summary>
+        /// Отладочный метод записывающий время вызова мониторинга.
+        /// Что бы не засорять основной лог.
+        /// </summary>
+        private void WriteToLog(string msg)
+        {
+            using (StreamWriter w = File.AppendText(LogPath))
+            {
+                string str = DateTime.Now.ToString("dd.MM.yyyy hh:mm:ss")+" "+msg;
+                w.WriteLine(str);
+            }
+        }
+
+        private void CreateLogFile()
+        {
+            //Тест
+            bool exists = System.IO.File.Exists(LogPath);
+            if (!exists)
+            {
+                using (StreamWriter writer = System.IO.File.CreateText(LogPath))
+                {
+                    writer.WriteLine("------------------");
+                    writer.WriteLine(DateTime.Now.ToString("dd.MM.yyyy hh:mm:ss"));
+                }
+            }
+        }
+
+
     }
 }
