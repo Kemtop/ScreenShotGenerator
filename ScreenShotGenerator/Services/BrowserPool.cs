@@ -87,6 +87,13 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private bool serviceStoping;
 
+        /// <summary>
+        /// Блокировка создания новых браузеров и отключение старых.
+        /// Нужно что бы анализатор нагрузки не мешал своп монитору.
+        /// </summary>
+        public bool lockBrowserManagment;
+
+
         public BrowserPool(String tmpDir, ref PoolTasks poolTask, BrowserEndJobOnPage OnBrowserTaskCompleted)
         {
             poolBrowserControls = new List<BrowserControlLogic>();
@@ -255,6 +262,8 @@ namespace ScreenShotGenerator.Services
                 poolBrowserControls.Add(Bl);
             }
 
+            //Сообщаю браузеру о новых задачах.Это нужно если происходит перезапуск браузера.
+            Bl.OnNewJob();//Что бы новый браузер начал обрабатывать задачу. 
         }
 
 
@@ -271,7 +280,8 @@ namespace ScreenShotGenerator.Services
             BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == id);
             if ((Bl != null) && (Bl.beginShutdown)) //Браузер не закрыт и уже была отправлена команда закрытия.
             {
-                Log.Information("Browser " + id.ToString() + " in closing process.");
+                Log.Information("Browser " + id.ToString() + " in closing process. Try new shutdown.");
+                Bl.shutdown();
                 return;
             }
 
@@ -293,8 +303,10 @@ namespace ScreenShotGenerator.Services
         /// <param name="browserId"></param>
         private void OnSwapLimit(int id,int size)
         {
+            lockBrowserManagment=true; //swap monitor блокирует работу анализатору нагрузки.
+
             //Нет критического переполнения свопа.
-            if(size<100000)
+            if (size<100000)
             {
                 OnEndLifeBrowser(id); //Обычная остановка браузера.
                 return;
@@ -310,15 +322,16 @@ namespace ScreenShotGenerator.Services
 
             if (Bl.beginShutdown) //Браузер не закрыт и уже была отправлена команда закрытия.
             {
-                Log.Information("Browser " + id.ToString() + " in closing process.");
+                Log.Information("Browser " + id.ToString() + " steel in closing process.");
+                Bl.shutdown();
                 return;
             }
 
             Bl.CriticalStop(); //Критическая остановка.
             //Критическая остановка браузера. Что бы система не упала от резкого роста swap(за 30сек 2Гб).
-            Log.Information("Critical stop for browser("+id.ToString()+").");            
+            Log.Information("Critical stop for browser("+id.ToString()+").Size="+size.ToString());            
             
-            Thread.Sleep(3000); //Ожидаение очистки swap, что бы система не упала.
+            Thread.Sleep(1000); //Ожидаение очистки swap, что бы система не упала.
             Log.Information("Browser " + id + " broken. Run new.");
             //Запускает новый браузер и создает логику управления.
             createItem(blankPage, BrowserIdGenerator.getId());
@@ -333,6 +346,8 @@ namespace ScreenShotGenerator.Services
         {
             if (serviceStoping) return; //Получена команда остановки сервиса. Ни как не реагируем на закрытие браузеров.
 
+            Log.Information("OnBrowserClose");
+
             //Проверить не работают ли процессы браузера.
             while (!swapMonitor.hasAnyProcess(id))
             {
@@ -340,19 +355,21 @@ namespace ScreenShotGenerator.Services
                 Thread.Sleep(10000);
             }
 
+            //Удалять данные браузера нельзя, так как могут остаться какие то процессы!
+            /*
             Log.Information("Browser(" + id.ToString() + ") processes stoping. Remove from browser pool.");
             BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == id);
             if (Bl != null) //Браузер cуществует.
             {
                 lock (lockerPool)
                 {
-                    poolBrowserControls.Remove(Bl);
+                   poolBrowserControls.Remove(Bl);
                 }
-                swapMonitor.removePid(id); //Удаляю информацию о процессах данного браузера.   
+               swapMonitor.removePid(id); //Удаляю информацию о процессах данного браузера.   
             }
             else
                 Log.Information("Browser(" + id.ToString() + ") not found in browser pool.");
-
+            */
         }
 
         /// <summary>
@@ -361,6 +378,10 @@ namespace ScreenShotGenerator.Services
         /// <param name="count"></param>
         public void startNewBrowser(int count)
         {
+            if (lockBrowserManagment) return; //swap monitor заблокировал управление.
+
+            Log.Information("startNewBrowser " + count.ToString());
+
             //Создаю новые браузеры.
             for (int i = 0; i < count; i++)
             {
@@ -386,6 +407,8 @@ namespace ScreenShotGenerator.Services
         /// <param name="count"></param>
         public void leaveWorkBrowsers(int needWork)
         {
+            if (lockBrowserManagment) return; //swap monitor заблокировал управление.
+
             lock (lockerPool)
             {
                 int curentWork = poolBrowserControls.Count();
@@ -394,13 +417,15 @@ namespace ScreenShotGenerator.Services
                 int needClose = curentWork - needWork; //Нужно закрыть.
                                                        //Выбираем требуемое количество браузеров для закрытия.
                                                        //Закрываем первые, а не последние. Что бы автоматически подчищать.
+                //Только те которые нормально работают.
                 IEnumerable<BrowserControlLogic> BLtoClose =
-                    poolBrowserControls.OrderBy(x => x.browserId).Take(needClose);
+                    poolBrowserControls.Where(x=>x.beginShutdown==false).OrderBy(x => x.browserId).Take(needClose);
 
                 //Отправляем всем сигнал завершения работы.
                 foreach (BrowserControlLogic B in BLtoClose)
                 {
                     B.shutdown();
+                    Log.Information("leaveWorkBrowsers "+B.browserId.ToString());
                     poolBrowserControls.Remove(B); //Очистить пул.                   
                 }
             }
@@ -418,7 +443,8 @@ namespace ScreenShotGenerator.Services
                 //Ищем не рабочий браузер.
                 BrowserControlLogic Bl = poolBrowserControls.First(x => x.browserId == id);
                 Bl.eventBrowserDie -= OnBrowserDie;
-                poolBrowserControls.Remove(Bl); //Очистить пул.
+                // poolBrowserControls.Remove(Bl); //Очистить пул.
+                Log.Information("OnBrowserDie");
             }
         }
 

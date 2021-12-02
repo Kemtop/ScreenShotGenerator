@@ -127,7 +127,7 @@ namespace ScreenShotGenerator.Services
         /// Список объектов для ожидания завершения браузером выполнения задачи.
         /// </summary>
         private List<waiterEvent> waiterEventList;
-
+        
 
         public ScreenShoter(
             IHttpContextAccessor context,
@@ -383,7 +383,6 @@ namespace ScreenShotGenerator.Services
         /// <param name="requestId"></param>
         private void OnBrowserTaskCompleted(string requestId)
         {
-
             //Поиск требуемого ид http запроса и сброс ожидания.
             foreach (var w in waiterEventList)
             {
@@ -394,8 +393,6 @@ namespace ScreenShotGenerator.Services
                 }
             }
         }
-
-
 
         /// <summary>
         /// Увеличивает значение счетчика идентификатора задач.
@@ -629,7 +626,7 @@ namespace ScreenShotGenerator.Services
                 //Если новая задача.
                 if (j.status == (int)enumTaskStatus.NewTask)
                 {
-                    j.fileName = "Tool long wait complete request from browser.";
+                    j.fileName = "Too long wait complete request from browser.";
                     j.status = 2;
                 }
             }

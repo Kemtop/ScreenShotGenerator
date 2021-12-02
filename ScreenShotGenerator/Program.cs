@@ -18,6 +18,13 @@ namespace ScreenShotGenerator
 
         public static void Main(string[] args)
         {
+            /*
+            SwapMonitor sm = new SwapMonitor();
+            sm.TestGetSystemctlInfo();
+            int y = 0;
+            if (y == 0) return;
+            */
+
             //Получаю конфигурацию,для настройки  Kestrel.
             IConfigurationRoot config_ = new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json", optional: false)

@@ -160,7 +160,7 @@ namespace ScreenShotGenerator.Services
 
             if (hasNew)
                 Log.Information("----------------");
-
+            
             return true;
         }
 
@@ -233,7 +233,6 @@ namespace ScreenShotGenerator.Services
                     answ = answ.Substring(pos211 + 1); //Беру строку после символа.
                     posLineEnd = answ.IndexOf('\n'); //Ищу конец строки.
                     string tmp = answ.Substring(1, posLineEnd - 1); //Копирую строку с данными.
-
                     Lines.Add(toPidInfo(tmp));
                 }
                 else
@@ -243,8 +242,19 @@ namespace ScreenShotGenerator.Services
                     {
                         answ = answ.Substring(pos208 + 1); //Беру строку после символа.
                         posLineEnd = answ.IndexOf('\n'); //Ищу конец строки.
-                        string tmp = answ.Substring(1, posLineEnd - 1); //Копирую строку с данными.
-                        Lines.Add(toPidInfo(tmp));
+                        if (posLineEnd != -1)
+                        {
+                            string tmp = answ.Substring(1, posLineEnd - 1); //Копирую строку с данными.
+                            Lines.Add(toPidInfo(tmp));
+                        }
+                        else
+                        {
+                            //Сообщение о процессе может содержать только номер заканчивающийся пробелом,
+                            //без какой либо информации.
+                            Log.Information("________________________No LF in end!"+answ);
+                        }
+
+                    
                         break;
                     }
                 }
@@ -267,9 +277,19 @@ namespace ScreenShotGenerator.Services
             info = info.Trim();
             mPidInfo m = new mPidInfo();
             int pos = info.IndexOf(' ');
-            string pid = info.Substring(0, pos);
-            string str = info.Substring(pos + 1);
 
+            string pid = "";
+            string str = "";
+            if (pos!=-1) //Есть название процесса.
+            {
+               pid = info.Substring(0, pos);
+               str = info.Substring(pos + 1);
+            }
+            else //Нет название процесса, только номер.
+            {
+                pid = info; 
+            }
+          
             m.pid = Convert.ToUInt32(pid);
             m.sysctlInfo = str;
             return m;
@@ -452,7 +472,7 @@ namespace ScreenShotGenerator.Services
                    
             }
         }
-
+               
         /// <summary>
         /// Работают ли какие либо процессы браузера?
         /// </summary>

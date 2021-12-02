@@ -1,14 +1,9 @@
 ﻿using ImageMagick;
-using OpenQA.Selenium;
 using ScreenShotGenerator.Services.Models;
 using ScreenShotGenerator.Services.ScreenShoterPools;
 using Serilog;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -109,6 +104,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private bool callEndLifeTime;
 
         /// <summary>
+        /// Задача или задачи из пула которые обрабатывает браузер.
+        /// </summary>
+        List<mJobPool> tasksFromPool;
+
+        /// <summary>
         ///Событие по завершению жизненного цикла, исчерпания лимита по выполнению скриншотов.
         /// </summary>
         /// <returns></returns>
@@ -183,12 +183,19 @@ namespace ScreenShotGenerator.Services.BrowserControl
         {
             //Может случиться что браузер останавливаться или остановлен,
             //в случае критической остановки(резкое увеличение swap). Поэтому игнорируем исключения.
-            try
-            {
-                Browser.quit();
-            }
-            catch
-            {  }
+            Log.Information("Call stopBrowser().");
+            Task.Run(()=> {
+                try
+                {
+                    Browser.quit();
+                }
+                catch(Exception ex)
+                {
+                    Log.Information("Exception in stopBrowser()"+ex.Message);
+                }
+            });
+
+           
         }
 
         /// <summary>
@@ -197,8 +204,9 @@ namespace ScreenShotGenerator.Services.BrowserControl
         public void CriticalStop()
         {
             beginShutdown = true;
+            threadIsRun = false;
             stopBrowser();       
-            waiter.Set(); //Будем логику обработки новой задачи.  
+            waiter.Set(); //Будем логику обработки новой задачи. 
         }
 
 
@@ -216,8 +224,15 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public void shutdown()
         {
+            if(beginShutdown==true) //Уже запущен процесс закрытия.
+            {
+                Log.Information("Try new shutdown().");
+                stopBrowser();
+            }
+
             beginShutdown = true;
-            waiter.Set(); //Будем логику обработки новой задачи.            
+            waiter.Set(); //Будем логику обработки новой задачи.
+            Log.Information("shutdown()");
         }
 
         /// <summary>
@@ -261,6 +276,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 //Проверка лимита на выполнение скриншотов,и генерация событий.
                 checkLifeTime();
 
+                tasksFromPool = data; //Для возможности критической остановки.
+
                 foreach (mJobPool p in data)
                 {
                     //Сервис останавливают. Выходим.
@@ -283,29 +300,22 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     int answ=Browser.takeScreenShot(p.url, filePath, p.fileName, ref p.wastedTime, p.imageSize,
                         ref p.fileSize);
 
-                    //Если критическая остановка.
-                    if (beginShutdown)
-                    {
-                        //Устанавливаем выполняемым задачам статус "Новая".
-                        ResetStatus(ref data);
-                        return;
-                    }
+                    //Если получена команда остановки браузера.
+                    if (IfBeginShutdown(ref data)) return;
 
                     //Browser die.
                     if (answ==-1)
                     {
-                        //Устанавливаем выполняемым задачам статус "Новая".
-                        ResetStatus(ref data);
-                        
-                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, "Browser DIE!", p.url, p.fileName);
-                        eventBrowserDie(browserId);
-                        stopBrowser(); //Останавливаю то что осталось от браузера(драйвер).                       
+                        actionsIfBrowserDie(ref data,p); //Действия если браузер умер.
                         return;
                     }
 
                     //Пустой объект screenShot.Проблеммы с сайтом.
                     if(answ == -2)
                     {
+                        //Если получена команда остановки браузера.
+                        if (IfBeginShutdown(ref data)) return;
+
                         p.status = (int)enumTaskStatus.End;
                         p.fileName = UrlErrorImg.badImg;
                         //Формирую событие по окончанию выполнения задачи.
@@ -360,15 +370,55 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
         /// <summary>
+        /// Действия если браузер умер.
+        /// </summary>
+        private void actionsIfBrowserDie(ref List<mJobPool> data, mJobPool p)
+        {
+            //Устанавливаем выполняемым задачам статус "Новая".
+            ResetStatus(ref data);
+            saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, "Browser DIE!", p.url, p.fileName);
+            eventBrowserDie(browserId);
+            stopBrowser(); //Останавливаю то что осталось от браузера(драйвер).  
+        }
+
+        /// <summary>
+        /// Если получена команда остановки браузера.
+        /// </summary>
+        /// <returns></returns>
+        private bool IfBeginShutdown(ref List<mJobPool> data)
+        {
+            //Если критическая остановка.
+            if (beginShutdown)
+            {
+                //Устанавливаем выполняемым задачам статус "Новая".
+                ResetStatus(ref data);
+                stopBrowser(); //Останавливаю то что осталось от браузера(драйвер).  
+                return true;
+            }
+
+            return false;
+        }
+
+
+        /// <summary>
         /// Меняет статус не выполненным задачам на "Новая".
         /// </summary>
         private void ResetStatus(ref List<mJobPool> data)
         {
+            string requestId=null;
             foreach (mJobPool t in data)
             {
                 if (t.status == (int)enumTaskStatus.LockByBrowser)
+                {
                     t.status = (int)enumTaskStatus.NewTask;
+                    requestId = t.requestId; //Сохраняю идентификатор запроса.
+                }
+                    
             }
+
+            //Если были задачи-генерирую событие что обработал.
+            if(requestId!=null)
+            finishedJob(requestId); //Передаю идентификатор http запроса.
         }
 
         /// <summary>
