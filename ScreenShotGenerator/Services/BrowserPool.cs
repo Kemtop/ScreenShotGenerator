@@ -282,6 +282,7 @@ namespace ScreenShotGenerator.Services
             {
                 Log.Information("Browser " + id.ToString() + " in closing process. Try new shutdown.");
                 Bl.shutdown();
+                swapMonitor.killBrowserProcesses(id);
                 return;
             }
 
@@ -324,6 +325,7 @@ namespace ScreenShotGenerator.Services
             {
                 Log.Information("Browser " + id.ToString() + " steel in closing process.");
                 Bl.shutdown();
+                swapMonitor.killBrowserProcesses(id);
                 return;
             }
 
@@ -332,6 +334,8 @@ namespace ScreenShotGenerator.Services
             Log.Information("Critical stop for browser("+id.ToString()+").Size="+size.ToString());            
             
             Thread.Sleep(1000); //Ожидаение очистки swap, что бы система не упала.
+            swapMonitor.killBrowserProcesses(id);
+
             Log.Information("Browser " + id + " broken. Run new.");
             //Запускает новый браузер и создает логику управления.
             createItem(blankPage, BrowserIdGenerator.getId());

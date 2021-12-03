@@ -50,11 +50,6 @@ namespace ScreenShotGenerator.Services
         private object lockSystemctlInfo;
 
         /// <summary>
-        /// Файл с временем запуска мониторинга.
-        /// </summary>
-        private string LogPath;
-
-        /// <summary>
         ///Cобытие по превышению лимита swap.
         /// </summary>
         /// <returns></returns>
@@ -63,8 +58,6 @@ namespace ScreenShotGenerator.Services
         {
             SystemctlInfo = new List<mPidInfo>();
             lockSystemctlInfo = new object();
-            LogPath= Directory.GetCurrentDirectory() + @"/swapmonitorLog.txt";
-            CreateLogFile();
         }
 
 
@@ -439,37 +432,47 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private void Monitor()
         {
-            WriteToLog("run monitor");
             //Получаю информацию о занимаемом пространстве swap процессами.
             List<mSwapInfo> swapData = GetSwapInfo();
             if (swapData == null) return;
+                       
+            //Выбираем процессы которые превысили лимит, и сортируем по убыванию размера свопа.
+            IEnumerable<mSwapInfo> limits = swapData.Where(x => x.swap > swapLimit).
+                OrderByDescending(x=>x.swap);
+            if (limits.Count() == 0) return; //Все хорошо.
+                      
+            List<int> closingBrowsers = new List<int>();//Ид браузеров для которых было сгенерировано событие.
 
-            WriteToLog("has data");
-            //Проверка лимитов.
-            foreach (mSwapInfo p in swapData)
+            foreach(mSwapInfo p in limits)
             {
-                if(p.swap> swapLimit)
+                //Ищем процесс с указанным pid.
+                mPidInfo process;
+                lock (lockSystemctlInfo)
                 {
-                    //Ищем процесс с указанным pid.
-                    mPidInfo process;
-                    lock (lockSystemctlInfo)
-                    {
-                      process = SystemctlInfo.FirstOrDefault(x => x.pid == p.pid);
-                    }
-                        
-                    if(process==null)
-                    {
-                        Log.Error("SwapMonitor:Can't found browser with pid=" + p.pid.ToString()+".");
-                        continue;
-                    }
-
-                    Log.Information("Swap limit for browserId=" + process.browserId.ToString()+
-                        ",process("+p.pid.ToString()+")="+p.name+",swap usage(Kb)="+p.swap+".");
-                    //Генерирую событие. Передаю размер используемого свопа
-                    //для критической остановки(если за 30сек своп выпрос до 2Гб.)
-                    eventSwapLimit(process.browserId,(int)p.swap);                    
+                    process = SystemctlInfo.FirstOrDefault(x => x.pid == p.pid);
                 }
-                   
+
+                if (process == null)
+                {
+                    Log.Error("SwapMonitor:Can't found browser with pid="
+                        + p.pid.ToString() + ";Name="+p.name+";size="+p.swap.ToString()+".");
+                    continue;
+                }
+
+                //Перенести вниз после теста.
+                Log.Information("Swap limit for browserId=" + process.browserId.ToString() +
+                   ",process(" + p.pid.ToString() + ")=" + p.name + ",swap usage(Kb)=" + p.swap + ".");
+
+                //Генерировали ли событие для данного браузера?
+                //В рамках данного мониторинга повторно не генерируем.
+                //События всегда будут генерироваться для самых больших процессов данного браузера.
+                if (closingBrowsers.Where(x => x == process.browserId).Count() > 0) continue; //Да. 
+
+                //Генерирую событие. Передаю размер используемого свопа
+                //для критической остановки(если за 30сек своп выпрос до 2Гб.)                    
+                eventSwapLimit(process.browserId, (int)p.swap);
+                //Сохраняю ид браузера что бы не генерировать события для всех процессов.
+                closingBrowsers.Add(process.browserId); 
             }
         }
                
@@ -503,33 +506,38 @@ namespace ScreenShotGenerator.Services
             return false;
         }
 
+       
         /// <summary>
-        /// Отладочный метод записывающий время вызова мониторинга.
-        /// Что бы не засорять основной лог.
+        /// Убивает все процессы браузера.
         /// </summary>
-        private void WriteToLog(string msg)
+        /// <param name="id"></param>
+        public void killBrowserProcesses(int id)
         {
-            using (StreamWriter w = File.AppendText(LogPath))
+            //Узнаю все pid для данного браузера.
+            List<mPidInfo> bprocesses;
+            lock (lockSystemctlInfo)
             {
-                string str = DateTime.Now.ToString("dd.MM.yyyy hh:mm:ss")+" "+msg;
-                w.WriteLine(str);
+                bprocesses = SystemctlInfo.Where(x => x.browserId == id).ToList();
             }
-        }
 
-        private void CreateLogFile()
-        {
-            //Тест
-            bool exists = System.IO.File.Exists(LogPath);
-            if (!exists)
+            if (bprocesses.Count() == 0)
             {
-                using (StreamWriter writer = System.IO.File.CreateText(LogPath))
+                Log.Error("[1]Can't find any pid for browser " + id.ToString() + " in SystemctlInfo.");
+                return;
+            }
+
+            foreach(mPidInfo pi in bprocesses)
+            {
+                try
                 {
-                    writer.WriteLine("------------------");
-                    writer.WriteLine(DateTime.Now.ToString("dd.MM.yyyy hh:mm:ss"));
+                    runCommand("kill "+pi.pid.ToString());
+                }
+                catch(Exception ex)
+                {
+                    Log.Information("Exception in killBrowserProcesses("+id.ToString()+")"+ex.Message);
                 }
             }
         }
-
 
     }
 }
