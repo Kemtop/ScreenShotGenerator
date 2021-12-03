@@ -66,6 +66,10 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private String tmpDir;
 
+        /// <summary>
+        /// Таймер разблокировки алгоритма управления браузерами.
+        /// </summary>
+        private Timer timerUnlockBrowserManagment;
 
         /// <summary>
         ///Содержимое страницы на которую браузер переходит перед созданием скрина. 
@@ -280,9 +284,7 @@ namespace ScreenShotGenerator.Services
             BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == id);
             if ((Bl != null) && (Bl.beginShutdown)) //Браузер не закрыт и уже была отправлена команда закрытия.
             {
-                Log.Information("Browser " + id.ToString() + " in closing process. Try new shutdown.");
-                Bl.shutdown();
-                swapMonitor.killBrowserProcesses(id);
+                KillNoClosedBrowser(Bl); //Убивает браузер который не захотел закрыться.
                 return;
             }
 
@@ -295,6 +297,9 @@ namespace ScreenShotGenerator.Services
                 Log.Error("Not found browser(" + id.ToString() + " in pool.");
             else
                 Bl.shutdown();//Остановка браузера.                    
+
+            //Разблокировка логики увеличения уменьшения количества браузеров в зависимости от нагрузки.
+            measureUnlockInterval();
         }
 
 
@@ -310,6 +315,7 @@ namespace ScreenShotGenerator.Services
             if (size<100000)
             {
                 OnEndLifeBrowser(id); //Обычная остановка браузера.
+                RemoveStopedBrowsersInPool();// Удаляет остановленные браузеры из пула.
                 return;
             }
 
@@ -323,9 +329,7 @@ namespace ScreenShotGenerator.Services
 
             if (Bl.beginShutdown) //Браузер не закрыт и уже была отправлена команда закрытия.
             {
-                Log.Information("Browser " + id.ToString() + " steel in closing process.");
-                Bl.shutdown();
-                swapMonitor.killBrowserProcesses(id);
+                KillNoClosedBrowser(Bl); //Убивает браузер который не захотел закрыться.
                 return;
             }
 
@@ -333,12 +337,51 @@ namespace ScreenShotGenerator.Services
             //Критическая остановка браузера. Что бы система не упала от резкого роста swap(за 30сек 2Гб).
             Log.Information("Critical stop for browser("+id.ToString()+").Size="+size.ToString());            
             
-            Thread.Sleep(1000); //Ожидаение очистки swap, что бы система не упала.
-            swapMonitor.killBrowserProcesses(id);
+            Thread.Sleep(1000); //Ожидание очистки swap, что бы система не упала.
+            KillBrowserProcesses(id); //Убиваем все процессы браузера.
 
             Log.Information("Browser " + id + " broken. Run new.");
             //Запускает новый браузер и создает логику управления.
             createItem(blankPage, BrowserIdGenerator.getId());
+
+            //Разблокировка логики увеличения уменьшения количества браузеров в зависимости от нагрузки.
+            measureUnlockInterval();
+            RemoveStopedBrowsersInPool();// Удаляет остановленные браузеры из пула.
+        }
+
+        /// <summary>
+        /// Убивает браузер который не захотел закрыться, и запускает процесс разблокировки логики
+        /// увеличения уменьшения количества браузеров в зависимости от нагрузки.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        private void KillNoClosedBrowser(BrowserControlLogic Bl)
+        {
+            Log.Information("Browser " +Bl.browserId.ToString() + " not closed. Try new shutdown and kill.");
+            Bl.shutdown();
+            KillBrowserProcesses(Bl.browserId); //Убиваем все процессы браузера.
+            //Разблокировка логики увеличения уменьшения количества браузеров в зависимости от нагрузки.
+            measureUnlockInterval();
+        }
+
+
+        /// <summary>
+        /// Убивает все процессы браузера.
+        /// </summary>
+        private void KillBrowserProcesses(int id)
+        {
+            swapMonitor.killBrowserProcesses(id); //Однозначное удаление всех процессов браузера.
+            BrowserControlLogic Bl = poolBrowserControls.FirstOrDefault(x => x.browserId == id);
+            if (Bl != null) //Браузер cуществует.
+            {
+                lock (lockerPool)
+                {
+                    poolBrowserControls.Remove(Bl);
+                }
+                swapMonitor.removePid(id); //Удаляю информацию о процессах данного браузера.   
+            }
+            else
+                Log.Information("Browser(" + id.ToString() + ") not found in browser pool.");
         }
 
 
@@ -460,5 +503,60 @@ namespace ScreenShotGenerator.Services
             serviceStoping = true;
             clearPool(); //Закрываю все браузеры.
         }
+
+        /// <summary>
+        /// Запускает таймер, после срабатывания которого происходит разблокировка логики увеличения или уменьшения количества
+        /// браузеров.
+        /// </summary>
+        private void measureUnlockInterval()
+        {
+            //Таймер еще не сработал, сдвигаем интервал.
+            if (timerUnlockBrowserManagment != null)
+            {
+                //Повторный перезапуск.
+                timerUnlockBrowserManagment.Change(Timeout.Infinite, Timeout.Infinite); //Что бы не сработало сейчас.
+                timerUnlockBrowserManagment.Dispose();//Полная остановка
+            }
+
+            timerUnlockBrowserManagment= new Timer((Object stateInfo) =>
+            {
+                ulockBrowserManagment();
+            }, null,120000 , 120000);
+        }
+
+        /// <summary>
+        /// Разблокировка логики увеличения или уменьшения количества
+        /// браузеров.
+        /// </summary>
+        private void ulockBrowserManagment()
+        {
+            timerUnlockBrowserManagment.Change(Timeout.Infinite, Timeout.Infinite); //Что бы не сработало сейчас.
+            timerUnlockBrowserManagment.Dispose();//Полная остановка
+            timerUnlockBrowserManagment = null;
+            lockBrowserManagment = false;
+            Log.Information("UlockBrowserManagment(create and stop browsers).");
+        }
+
+        /// <summary>
+        /// Удаляет остановленные браузеры из пула.
+        /// </summary>
+        private void RemoveStopedBrowsersInPool()
+        {
+            DateTime now = DateTime.Now;
+            lock (lockerPool)
+            {                
+                //Браузер остановлен час назад.
+               IEnumerable<BrowserControlLogic> BList=poolBrowserControls.
+                Where(x=>x.beginShutdown==true&&x.EndLifeTime.AddHours(1)>now);
+
+                foreach(BrowserControlLogic Bl in BList)
+                {
+                    swapMonitor.removePid(Bl.browserId); //Удаляю информацию о процессах данного браузера.   
+                    poolBrowserControls.Remove(Bl);
+                    Log.Information("Browser("+Bl.browserId.ToString()+") remove from pool.");
+                }
+            }
+        }
+
     }
 }

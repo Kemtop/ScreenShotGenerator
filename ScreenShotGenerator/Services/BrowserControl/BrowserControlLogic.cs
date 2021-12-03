@@ -125,6 +125,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
         public bool beginShutdown;
 
         /// <summary>
+        /// Время получения команды остановки браузера.
+        /// </summary>
+        public DateTime EndLifeTime;
+
+        /// <summary>
         /// Событие возникающее когда браузер закрыт.
         /// </summary>
         public event browserCloseDg eventClosed;
@@ -203,6 +208,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public void CriticalStop()
         {
+            ResetStatus(ref tasksFromPool);//Очистка взятых задач.
             beginShutdown = true;
             threadIsRun = false;
             stopBrowser();       
@@ -224,13 +230,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public void shutdown()
         {
-            if(beginShutdown==true) //Уже запущен процесс закрытия.
-            {
-                Log.Information("Try new shutdown().");
-                stopBrowser();
-            }
-
             beginShutdown = true;
+            EndLifeTime = DateTime.Now; //Время окончания жизни браузера.
             waiter.Set(); //Будем логику обработки новой задачи.
             Log.Information("shutdown()");
         }

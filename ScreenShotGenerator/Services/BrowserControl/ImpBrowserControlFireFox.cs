@@ -203,7 +203,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
                         
-            Log.Information("Run FireFox. Control Module Version 1.14.");
+            Log.Information("Run FireFox. Control Module Version 1.15.");
             return true;
         }
  
@@ -314,7 +314,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
 
                 //Проверка наличия открытых нескольких окон.И их закрытие. Если этого не делать,страницы складываются
                 //в swap, что приводит к его переполнению.
-                //checkManyOpenWindows(url);
+                checkManyOpenWindows(url);
             }
             catch (Exception ex)
             {
