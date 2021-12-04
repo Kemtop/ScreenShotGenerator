@@ -181,7 +181,8 @@ namespace ScreenShotGenerator.Services
         {
             lock (lockerPool)
             {
-                return poolBrowserControls.Count;
+                //Количество живых браузеров.
+                return poolBrowserControls.Where(x=>x.beginShutdown==false).Count();
             }
         }
 
@@ -426,8 +427,10 @@ namespace ScreenShotGenerator.Services
         public void startNewBrowser(int count)
         {
             if (lockBrowserManagment) return; //swap monitor заблокировал управление.
+            //Можно ли изменять количество браузеров. Не делали ли это только что?
+            if (!TimeLimitManipulationAllow.WeCanManipulationBrowsersAmount()) return;
 
-            Log.Information("startNewBrowser " + count.ToString());
+            Log.Information("startNewBrowser by request logic " + count.ToString());
 
             //Создаю новые браузеры.
             for (int i = 0; i < count; i++)
@@ -455,6 +458,8 @@ namespace ScreenShotGenerator.Services
         public void leaveWorkBrowsers(int needWork)
         {
             if (lockBrowserManagment) return; //swap monitor заблокировал управление.
+            //Можно ли изменять количество браузеров. Не делали ли это только что?
+            if (!TimeLimitManipulationAllow.WeCanManipulationBrowsersAmount()) return;
 
             lock (lockerPool)
             {
@@ -472,9 +477,10 @@ namespace ScreenShotGenerator.Services
                 foreach (BrowserControlLogic B in BLtoClose)
                 {
                     B.shutdown();
-                    Log.Information("leaveWorkBrowsers "+B.browserId.ToString());
+                    Log.Information("leaveWorkBrowser by request logic " + B.browserId.ToString());
                     poolBrowserControls.Remove(B); //Очистить пул.                   
                 }
+                Log.Information("Closed by request logic " + BLtoClose.Count().ToString()+" browsers.");
             }
 
         }
@@ -542,20 +548,28 @@ namespace ScreenShotGenerator.Services
         /// </summary>
         private void RemoveStopedBrowsersInPool()
         {
-            DateTime now = DateTime.Now;
-            lock (lockerPool)
-            {                
-                //Браузер остановлен час назад.
-               IEnumerable<BrowserControlLogic> BList=poolBrowserControls.
-                Where(x=>x.beginShutdown==true&&x.EndLifeTime.AddHours(1)>now);
-
-                foreach(BrowserControlLogic Bl in BList)
+            try
+            {
+                DateTime now = DateTime.Now;
+                lock (lockerPool)
                 {
-                    swapMonitor.removePid(Bl.browserId); //Удаляю информацию о процессах данного браузера.   
-                    poolBrowserControls.Remove(Bl);
-                    Log.Information("Browser("+Bl.browserId.ToString()+") remove from pool.");
+                    //Браузер остановлен час назад.
+                    IEnumerable<BrowserControlLogic> BList = poolBrowserControls.
+                     Where(x => x.beginShutdown == true && (now-x.EndLifeTime).TotalHours>1.0);
+
+                    foreach (BrowserControlLogic Bl in BList)
+                    {
+                        swapMonitor.removePid(Bl.browserId); //Удаляю информацию о процессах данного браузера.   
+                        poolBrowserControls.Remove(Bl);
+                        Log.Information("Browser(" + Bl.browserId.ToString() + ") remove from pool.");
+                    }
                 }
             }
+            catch(Exception ex)
+            {
+                Log.Error("Exception RemoveStopedBrowsersInPool "+ex.Message);
+            }
+           
         }
 
     }
