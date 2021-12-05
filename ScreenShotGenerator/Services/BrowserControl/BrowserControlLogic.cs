@@ -375,11 +375,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private void actionsIfBrowserDie(ref List<mJobPool> data, mJobPool p)
         {
+            beginShutdown = true; //Браузер готовиться закрыться.
             //Устанавливаем выполняемым задачам статус "Новая".
             ResetStatus(ref data);
             saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, "Browser DIE!", p.url, p.fileName);
-            eventBrowserDie(browserId);
-            stopBrowser(); //Останавливаю то что осталось от браузера(драйвер).  
+            stopBrowser(); //Останавливаю то что осталось от браузера(драйвер). 
+            eventBrowserDie(browserId);             
         }
 
         /// <summary>

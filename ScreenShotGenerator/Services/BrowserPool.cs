@@ -67,11 +67,6 @@ namespace ScreenShotGenerator.Services
         private String tmpDir;
 
         /// <summary>
-        /// Таймер разблокировки алгоритма управления браузерами.
-        /// </summary>
-        private Timer timerUnlockBrowserManagment;
-
-        /// <summary>
         ///Содержимое страницы на которую браузер переходит перед созданием скрина. 
         /// </summary>
         string blankPage;
@@ -90,13 +85,6 @@ namespace ScreenShotGenerator.Services
         /// Информирует ждущие службы об остановке сервиса.
         /// </summary>
         private bool serviceStoping;
-
-        /// <summary>
-        /// Блокировка создания новых браузеров и отключение старых.
-        /// Нужно что бы анализатор нагрузки не мешал своп монитору.
-        /// </summary>
-        public bool lockBrowserManagment;
-
 
         public BrowserPool(String tmpDir, ref PoolTasks poolTask, BrowserEndJobOnPage OnBrowserTaskCompleted)
         {
@@ -300,7 +288,7 @@ namespace ScreenShotGenerator.Services
                 Bl.shutdown();//Остановка браузера.                    
 
             //Разблокировка логики увеличения уменьшения количества браузеров в зависимости от нагрузки.
-            measureUnlockInterval();
+            TimeLimitManipulationAllow.UnlockBrowserManagment();
         }
 
 
@@ -310,7 +298,8 @@ namespace ScreenShotGenerator.Services
         /// <param name="browserId"></param>
         private void OnSwapLimit(int id,int size)
         {
-            lockBrowserManagment=true; //swap monitor блокирует работу анализатору нагрузки.
+            //Блокировка создания новых браузеров и отключение старых системой регулировки нагрузки.
+            TimeLimitManipulationAllow.LockBrowserManagment(); //swap monitor блокирует работу анализатору нагрузки.
 
             //Нет критического переполнения свопа.
             if (size<100000)
@@ -346,7 +335,7 @@ namespace ScreenShotGenerator.Services
             createItem(blankPage, BrowserIdGenerator.getId());
 
             //Разблокировка логики увеличения уменьшения количества браузеров в зависимости от нагрузки.
-            measureUnlockInterval();
+            TimeLimitManipulationAllow.UnlockBrowserManagment();
             RemoveStopedBrowsersInPool();// Удаляет остановленные браузеры из пула.
         }
 
@@ -362,7 +351,7 @@ namespace ScreenShotGenerator.Services
             Bl.shutdown();
             swapMonitor.killBrowserProcesses(Bl.browserId); //Однозначное удаление всех процессов браузера.
             //Разблокировка логики увеличения уменьшения количества браузеров в зависимости от нагрузки.
-            measureUnlockInterval();
+            TimeLimitManipulationAllow.UnlockBrowserManagment();
         }
 
 
@@ -406,11 +395,11 @@ namespace ScreenShotGenerator.Services
         /// <param name="count"></param>
         public void startNewBrowser(int count)
         {
-            if (lockBrowserManagment) return; //swap monitor заблокировал управление.
+            //swap monitor заблокировал управление.
             //Можно ли изменять количество браузеров. Не делали ли это только что?
             if (!TimeLimitManipulationAllow.WeCanManipulationBrowsersAmount()) return;
 
-            Log.Information("startNewBrowser by request logic " + count.ToString());
+            Log.Information("startNewBrowser by request logic " + count.ToString()+" items.");
 
             //Создаю новые браузеры.
             for (int i = 0; i < count; i++)
@@ -437,14 +426,17 @@ namespace ScreenShotGenerator.Services
         /// <param name="count"></param>
         public void leaveWorkBrowsers(int needWork)
         {
-            if (lockBrowserManagment) return; //swap monitor заблокировал управление.
+            //swap monitor заблокировал управление.
             //Можно ли изменять количество браузеров. Не делали ли это только что?
             if (!TimeLimitManipulationAllow.WeCanManipulationBrowsersAmount()) return;
 
             lock (lockerPool)
             {
-                int curentWork = poolBrowserControls.Count();
+                //Выбираю только рабочие браузеры.
+                int curentWork = poolBrowserControls.Where(x=>x.beginShutdown==false).Count();
                 if (needWork >= curentWork) return; //Не чего закрывать.Работает меньше чем требуется.
+
+                Log.Information("Now work "+curentWork.ToString()+" browsers.");
 
                 int needClose = curentWork - needWork; //Нужно закрыть.
                                                        //Выбираем требуемое количество браузеров для закрытия.
@@ -465,20 +457,33 @@ namespace ScreenShotGenerator.Services
 
         }
 
+
+
         /// <summary>
         /// Обработчик события выхода из строя браузера.
         /// </summary>
         /// <param name="browserId"></param>
         private void OnBrowserDie(int id)
         {
+            //Блокировка создания новых браузеров и отключение старых системой регулировки нагрузки.
+            TimeLimitManipulationAllow.LockBrowserManagment(); //swap monitor блокирует работу анализатору нагрузки.
+
             lock (lockerPool)
             {
                 //Ищем не рабочий браузер.
                 BrowserControlLogic Bl = poolBrowserControls.First(x => x.browserId == id);
                 Bl.eventBrowserDie -= OnBrowserDie;
-                // poolBrowserControls.Remove(Bl); //Очистить пул.
-                Log.Information("OnBrowserDie");
             }
+
+            Log.Information("Browser(" + id.ToString() + ") Die. Kill him processes.");
+            swapMonitor.killBrowserProcesses(id); //Однозначное удаление всех процессов браузера.
+
+            Log.Information("Run new.");
+            //Запускает новый браузер и создает логику управления.
+            createItem(blankPage, BrowserIdGenerator.getId());
+
+            //Разблокировка логики увеличения уменьшения количества браузеров в зависимости от нагрузки.
+            TimeLimitManipulationAllow.UnlockBrowserManagment();
         }
 
         /// <summary>
@@ -490,38 +495,6 @@ namespace ScreenShotGenerator.Services
             clearPool(); //Закрываю все браузеры.
         }
 
-        /// <summary>
-        /// Запускает таймер, после срабатывания которого происходит разблокировка логики увеличения или уменьшения количества
-        /// браузеров.
-        /// </summary>
-        private void measureUnlockInterval()
-        {
-            //Таймер еще не сработал, сдвигаем интервал.
-            if (timerUnlockBrowserManagment != null)
-            {
-                //Повторный перезапуск.
-                timerUnlockBrowserManagment.Change(Timeout.Infinite, Timeout.Infinite); //Что бы не сработало сейчас.
-                timerUnlockBrowserManagment.Dispose();//Полная остановка
-            }
-
-            timerUnlockBrowserManagment= new Timer((Object stateInfo) =>
-            {
-                ulockBrowserManagment();
-            }, null,120000 , 120000);
-        }
-
-        /// <summary>
-        /// Разблокировка логики увеличения или уменьшения количества
-        /// браузеров.
-        /// </summary>
-        private void ulockBrowserManagment()
-        {
-            timerUnlockBrowserManagment.Change(Timeout.Infinite, Timeout.Infinite); //Что бы не сработало сейчас.
-            timerUnlockBrowserManagment.Dispose();//Полная остановка
-            timerUnlockBrowserManagment = null;
-            lockBrowserManagment = false;
-            Log.Information("UlockBrowserManagment(create and stop browsers).");
-        }
 
         /// <summary>
         /// Удаляет остановленные браузеры из пула.

@@ -12,6 +12,12 @@ namespace ScreenShotGenerator.Services.BrowserControl
     public class TimeLimitManipulationAllow
     {
         /// <summary>
+        /// Блокировка создания новых браузеров и отключение старых.
+        /// Нужно что бы анализатор нагрузки не мешал своп монитору.
+        /// </summary>
+        private static bool lockBrowserManagment;
+
+        /// <summary>
         /// Время последнего действия.
         /// </summary>
         private static DateTime lastSwitchBrowserAction=DateTime.Now;
@@ -22,6 +28,8 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// <returns></returns>
         public static bool WeCanManipulationBrowsersAmount()
         {
+            if (lockBrowserManagment) return false; //Заблокирован внешней логикой.
+
             DateTime n = DateTime.Now;
             //Сколько прошло минут.
             double minute = (n - lastSwitchBrowserAction).TotalMinutes;
@@ -32,5 +40,26 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
             return false;
         }
+
+
+        /// <summary>
+        ///  Блокировка создания новых браузеров и отключение старых системой регулировки нагрузки.
+        /// </summary>
+        public static void LockBrowserManagment()
+        {
+            lockBrowserManagment = true; //Запрет работы логики. 
+        }
+
+
+        /// <summary>
+        ///  Разблокировка создания новых браузеров и отключение старых системой регулировки нагрузки.
+        /// </summary>
+        public static void UnlockBrowserManagment()
+        {
+            lastSwitchBrowserAction = DateTime.Now; //Обновление времени последних действий.
+            lockBrowserManagment = false; //Запрет работы логики. 
+        }
+
+
     }
 }
