@@ -203,7 +203,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
                         
-            Log.Information("Run FireFox. Control Module Version 1.19.");
+            Log.Information("Run FireFox. Control Module Version 1.20.");
             return true;
         }
  

@@ -182,12 +182,23 @@ namespace ScreenShotGenerator.Services.BrowserControl
         }
 
         /// <summary>
+        /// Взводит флаг сигнализирующий что браузер перестал работать, ставит дату окончания работы.
+        /// </summary>
+        private void setStopStatus()
+        {
+            EndLifeTime = DateTime.Now; //Время окончания жизни браузера.
+            beginShutdown = true; //Информация другим процессам-браузер не работает.
+        }
+
+
+        /// <summary>
         /// Остановка браузера, если не остановлен.
         /// </summary>
         private void stopBrowser()
         {
             //Может случиться что браузер останавливаться или остановлен,
             //в случае критической остановки(резкое увеличение swap). Поэтому игнорируем исключения.
+            setStopStatus(); //Взводит флаг сигнализирующий что браузер перестал работать, ставит дату окончания работы.
             Log.Information("Call stopBrowser().");
             Task.Run(()=> {
                 try
@@ -198,9 +209,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 {
                     Log.Information("Exception in stopBrowser()"+ex.Message);
                 }
-            });
-
-           
+            });           
         }
 
         /// <summary>
@@ -209,7 +218,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         public void CriticalStop()
         {
             ResetStatus(ref tasksFromPool);//Очистка взятых задач.
-            beginShutdown = true;
+            setStopStatus(); //Взводит флаг сигнализирующий что браузер перестал работать, ставит дату окончания работы.
             threadIsRun = false;
             stopBrowser();       
             waiter.Set(); //Будем логику обработки новой задачи. 
@@ -230,8 +239,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         public void shutdown()
         {
-            beginShutdown = true;
-            EndLifeTime = DateTime.Now; //Время окончания жизни браузера.
+            setStopStatus(); //Взводит флаг сигнализирующий что браузер перестал работать, ставит дату окончания работы.
             waiter.Set(); //Будем логику обработки новой задачи.
             Log.Information("shutdown()");
         }
@@ -375,7 +383,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
         /// </summary>
         private void actionsIfBrowserDie(ref List<mJobPool> data, mJobPool p)
         {
-            beginShutdown = true; //Браузер готовиться закрыться.
+            setStopStatus(); //Взводит флаг сигнализирующий что браузер перестал работать, ставит дату окончания работы.
             //Устанавливаем выполняемым задачам статус "Новая".
             ResetStatus(ref data);
             saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, "Browser DIE!", p.url, p.fileName);
