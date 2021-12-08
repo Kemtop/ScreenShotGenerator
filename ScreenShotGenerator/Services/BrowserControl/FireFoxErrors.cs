@@ -10,6 +10,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
     /// </summary>
     public class FireFoxErrors
     {
+
         /// <summary>
         /// Открыто Alert окно.
         /// </summary>
@@ -70,5 +71,6 @@ namespace ScreenShotGenerator.Services.BrowserControl
             }
             return true;
         }
-    }
+
+   }
 }

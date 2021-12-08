@@ -72,9 +72,14 @@ namespace ScreenShotGenerator.Services.BrowserControl
         private string lastUrl;
 
         /// <summary>
+        /// Анализатор появления ошибки TimedPromise timed out after при переходе на пустую страницу.
+        /// </summary>
+        private FirefoxTimedPromiseBlankPageMonitor firefoxTimedPromiseBlankPageMonitor;
+
+        /// <summary>
         /// Объект для выполнения js скриптов.
         /// </summary>
-        IJavaScriptExecutor JsExecuter;
+        private IJavaScriptExecutor JsExecuter;
 
         /// <summary>
         /// Возвращает ошибку.
@@ -93,9 +98,11 @@ namespace ScreenShotGenerator.Services.BrowserControl
             curentDirectory = Directory.GetCurrentDirectory();
             this.pageLoadTimeouts = pageLoadTimeouts;
             this.javaScriptTimeouts = javaScriptTimeouts;
+            //Мониторинг аномалий при переходе на главную страницу.
+            firefoxTimedPromiseBlankPageMonitor = new FirefoxTimedPromiseBlankPageMonitor();
 
             //Тест
-            
+
             bool exists = System.IO.File.Exists(getAlertPathFile());
             if (!exists)
             {
@@ -203,7 +210,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                 return false;
             }
                         
-            Log.Information("Run FireFox. Control Module Version 1.20.");
+            Log.Information("Run FireFox. Control Module Version 1.21.");
             return true;
         }
  
@@ -225,12 +232,25 @@ namespace ScreenShotGenerator.Services.BrowserControl
             //Анализируем ошибки и делаем вывод можно ли дальше работать.
             if (!Navigate(blankPage, ref hasException, filename)) return -1; //Браузер не работает.
             //По непонятным причинам браузер не хочет обрабатывать страницу(строку с html),выбивает таймаут. 
-            if(hasException) 
+            if (hasException)
             {
                 SaveBrowserError("Warning:" +
-                    "Time out on blank page after(last url="+ lastUrl 
-                    + ",curent url:"+url+") :", lastError,url, filename); //Сохраняю в лог.
+                    "Time out on blank page after(last url=" + lastUrl
+                    + ",curent url:" + url + ") :", lastError, url, filename); //Сохраняю в лог.
+
+                //Анализ повторения ошибки TimedPromise timed out after.
+                if (firefoxTimedPromiseBlankPageMonitor.ErrorToGoBlankPage(lastError))
+                {
+                    SaveBrowserError("Double error browser TimedPromise timed out after on blank page." +
+                    "Think that browser die. Stop.", lastError, url, filename); //Сохраняю в лог.
+                    return -1; //Браузер не работает. Команда браузер вышел из строя.
+                }
             }
+            else
+                //Все хорошо с переходом на пустую страницу,сбросим счетчик ошибки TimedPromise timed out after.
+                firefoxTimedPromiseBlankPageMonitor.ResetErrorTimedPromise();
+
+
 
             //Измеряю затраченное время на открытие страницы.
             Stopwatch sw = new Stopwatch();
