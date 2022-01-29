@@ -17,7 +17,7 @@ packages/
 *.user
 *.userosscache
 *.sln.docstates
-*.zip
+
 
 # Build results
 [Dd]ebug/

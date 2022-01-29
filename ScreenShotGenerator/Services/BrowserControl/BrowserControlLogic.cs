@@ -299,6 +299,23 @@ namespace ScreenShotGenerator.Services.BrowserControl
                         finishedJob(p.requestId); //Передаю идентификатор http запроса.
                         continue;
                     }
+                                     
+
+                    //Проверка нахождение сайта в черном списке.
+                    if (BlackUrlList.InBlackList(p.url))
+                    {
+
+                        string errMsg = "Error:URL in black list!";
+                        p.status = (int)enumTaskStatus.End;
+                        p.fileName = UrlErrorImg.badUrl;
+                        //Cохраняю логи в БД.
+                        saveBrowserErrorDg((int)enumBrowserError.PostProcessingCheckError, errMsg, p.url, p.fileName);
+                      
+                        //Формирую событие по окончанию выполнения задачи.
+                        finishedJob(p.requestId); //Передаю идентификатор http запроса.
+                        continue;
+                    }
+
 
                     String lastError=""; //Последнее сообщение об ошибке, если есть.
                     p.fileName = getMD5(p.url) + ".jpg"; //Формирую имя файла.
@@ -315,6 +332,7 @@ namespace ScreenShotGenerator.Services.BrowserControl
                     //Browser die.
                     if (answ==-1)
                     {
+                        BlackUrlList.AddUrl(p.url); //Добавляю урл который привел к паденею браузера в черный список.                                                                        
                         actionsIfBrowserDie(ref data,p); //Действия если браузер умер.
                         return;
                     }
