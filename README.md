@@ -5,6 +5,7 @@
 <p align="left">
 Asp net.core 5 приложение.<br>
 Точный дизайн сайта пока не определен.<br>
+Прототип новой реализации «скриншоттера» для onlinezakladki.ru.
  Front часть содержит авторизацию по логину и соцсети Facebook. 
  <img src="./readme_assets/img1.png" width="100%">
 </p>
