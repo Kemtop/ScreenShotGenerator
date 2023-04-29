@@ -12,13 +12,13 @@
 Можно использовать kubernetes для мониторинга контейнеров, внутри которых работает  Selenium. Но такая идея не прорабатывалась.
 </p>
 <p align="left">
-<a href="./Doc/UI/UI.md">Внешний вид UI</a> 
+<a href="./Docs/UI/UI.md">Внешний вид UI</a> 
 </p>
 <p align="left">
-<a href="./Doc/Api/Api.md">Описание API</a> 
+<a href="./Docs/Api/Api.md">Описание API</a> 
 </p>
 <p align="left">
-<a href="./Doc/TestMethod/TestMethod.md">Методика тестирования</a> 
+<a href="./Docs/TestMethod/TestMethod.md">Методика тестирования</a> 
 </p>
 <br>
 <p align="left">
